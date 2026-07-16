@@ -1,19 +1,23 @@
 import re
 
 from vkbottle.bot import Bot, Message
-from vkbottle.dispatch.rules.base import RegexRule
 
 from bot.keyboards import main_keyboard, raid_targets_keyboard
 from db.database import SessionLocal
 from handlers.common import resolve_name
+from handlers.rules import match_cmd, payload_cmd
 from services.player import get_or_create_player
 from services.war import WarError, raid, raid_candidates
 
 RAID_RE = re.compile(r"^(?:⚔|рейд)\s+(.+)$", re.IGNORECASE)
 
 
+def _is_raid_text(message: Message) -> bool:
+    return bool(RAID_RE.match((message.text or "").strip()))
+
+
 def register(bot: Bot) -> None:
-    @bot.on.message(text=["война", "⚔ война", "рейд", "⚔ рейд"])
+    @bot.on.message(func=match_cmd("war", "война", "⚔ война", "рейд", "⚔ рейд"))
     async def war_menu(message: Message):
         name = await resolve_name(message)
         async with SessionLocal() as session:
@@ -57,32 +61,43 @@ def register(bot: Bot) -> None:
                 keyboard=raid_targets_keyboard([t.name for t in targets]).get_json(),
             )
 
-    @bot.on.message(RegexRule(RAID_RE))
-    async def raid_command(message: Message):
+    @bot.on.message(func=payload_cmd("raid"))
+    async def raid_by_payload(message: Message):
+        payload = message.get_payload_json() or {}
+        target = str(payload.get("target") or "").strip()
+        if not target:
+            return
+        await _do_raid(message, target)
+
+    @bot.on.message(func=_is_raid_text)
+    async def raid_by_text(message: Message):
         match = RAID_RE.match((message.text or "").strip())
         if not match:
             return
         target = match.group(1).strip()
         if not target:
             return
+        await _do_raid(message, target)
 
-        name = await resolve_name(message)
-        async with SessionLocal() as session:
-            player = await get_or_create_player(session, message.from_id, name)
-            try:
-                result = await raid(session, player, target)
-            except WarError as e:
-                await message.answer(e.message, keyboard=main_keyboard().get_json())
-                return
 
-            atk = result["attacker"]
-            dfn = result["defender"]
-            await message.answer(
-                f"⚔ Рейд успешен!\n"
-                f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
-                f"Захвачено: {result['stolen']} крон\n"
-                f"В казну: +{result['treasury_cut']}\n"
-                f"Лидеру: +{result['leader_cut']} (баланс {result['leader_crowns']})\n"
-                f"Казна цели теперь: {dfn.treasury}",
-                keyboard=main_keyboard().get_json(),
-            )
+async def _do_raid(message: Message, target: str) -> None:
+    name = await resolve_name(message)
+    async with SessionLocal() as session:
+        player = await get_or_create_player(session, message.from_id, name)
+        try:
+            result = await raid(session, player, target)
+        except WarError as e:
+            await message.answer(e.message, keyboard=main_keyboard().get_json())
+            return
+
+        atk = result["attacker"]
+        dfn = result["defender"]
+        await message.answer(
+            f"⚔ Рейд успешен!\n"
+            f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
+            f"Захвачено: {result['stolen']} крон\n"
+            f"В казну: +{result['treasury_cut']}\n"
+            f"Лидеру: +{result['leader_cut']} (баланс {result['leader_crowns']})\n"
+            f"Казна цели теперь: {dfn.treasury}",
+            keyboard=main_keyboard().get_json(),
+        )

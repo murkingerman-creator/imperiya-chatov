@@ -3,11 +3,14 @@ from vkbottle.bot import Bot, Message
 from bot.keyboards import main_keyboard
 from db.database import SessionLocal
 from handlers.common import ensure_player
+from handlers.rules import match_cmd
 from services.nation import top_nations, top_players
 
 
 def register(bot: Bot) -> None:
-    @bot.on.message(text=["топ", "топ стран", "🏆 топ стран"])
+    @bot.on.message(
+        func=match_cmd("top_nations", "топ", "топ стран", "🏆 топ стран")
+    )
     async def top_nations_handler(message: Message):
         await ensure_player(message)
         async with SessionLocal() as session:
@@ -29,7 +32,9 @@ def register(bot: Bot) -> None:
                 )
             await message.answer("\n".join(lines), keyboard=main_keyboard().get_json())
 
-    @bot.on.message(text=["топ игроков", "💰 топ игроков"])
+    @bot.on.message(
+        func=match_cmd("top_players", "топ игроков", "💰 топ игроков")
+    )
     async def top_players_handler(message: Message):
         await ensure_player(message)
         async with SessionLocal() as session:

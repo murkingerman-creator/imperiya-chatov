@@ -4,12 +4,12 @@ from bot import config
 from bot.keyboards import main_keyboard
 from db.database import SessionLocal
 from handlers.common import resolve_name
-from handlers.rules import text_in
+from handlers.rules import match_cmd
 from services.player import energy_next_in_minutes, get_or_create_player, regenerate_energy
 
 
 def register(bot: Bot) -> None:
-    @bot.on.message(func=text_in("профиль", "👤 профиль", "я"))
+    @bot.on.message(func=match_cmd("profile", "профиль", "👤 профиль", "я"))
     async def profile_handler(message: Message):
         name = await resolve_name(message)
         async with SessionLocal() as session:
