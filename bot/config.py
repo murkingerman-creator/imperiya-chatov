@@ -6,7 +6,17 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-VK_TOKEN = os.getenv("VK_TOKEN", "").strip()
+
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+# Bothost часто кладёт токен из формы в BOT_TOKEN / API_TOKEN
+VK_TOKEN = _first_env("VK_TOKEN", "BOT_TOKEN", "API_TOKEN", "VK_BOT_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_ID", "240303101"))
 
 DB_PATH = BASE_DIR / "data" / "empire.db"
@@ -33,5 +43,6 @@ RAID_TREASURY_SHARE = 0.70
 def require_config() -> None:
     if not VK_TOKEN or VK_TOKEN.startswith("vk1.a.your_group_token"):
         raise RuntimeError(
-            "VK_TOKEN не задан. Скопируй .env.example в .env и вставь токен группы."
+            "Токен VK не задан. На Bothost укажи Bot Token в форме "
+            "или переменную VK_TOKEN / BOT_TOKEN. Локально — файл .env."
         )
