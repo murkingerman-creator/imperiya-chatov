@@ -1,3 +1,5 @@
+import secrets
+import string
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -20,6 +22,11 @@ def ensure_aware(dt: datetime | None) -> datetime | None:
     return dt
 
 
+def generate_invite_code(length: int = 6) -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
 async def get_or_create_player(
     session: AsyncSession, vk_id: int, name: str = ""
 ) -> Player:
@@ -30,6 +37,8 @@ async def get_or_create_player(
     if player:
         if name and player.name != name:
             player.name = name
+        if not player.invite_code:
+            player.invite_code = generate_invite_code()
         regenerate_energy(player)
         return player
 
@@ -39,6 +48,8 @@ async def get_or_create_player(
         crowns=config.START_CROWNS,
         energy=config.MAX_ENERGY,
         energy_updated_at=utcnow(),
+        invite_code=generate_invite_code(),
+        daily_streak=0,
     )
     session.add(player)
     await session.commit()

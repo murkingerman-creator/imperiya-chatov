@@ -1,61 +1,55 @@
 from vkbottle.bot import Bot, Message
 
 from bot import config
-from bot.keyboards import cancel_keyboard, main_keyboard, nation_keyboard
+from bot.keyboards import (
+    confirm_dissolve_keyboard,
+    citizens_keyboard,
+    customize_keyboard,
+    main_keyboard,
+    nation_keyboard,
+    preset_keyboard,
+    tax_keyboard,
+    cancel_keyboard,
+)
 from db.database import SessionLocal
 from handlers.common import resolve_name
-from handlers.rules import match_cmd, payload_cmd, text_in
+from handlers.rules import match_cmd, payload_cmd
+from services.chronicle_store import add_event
+from services.customize import CustomizeError, set_field
 from services.nation import (
     NationError,
     count_citizens,
+    dissolve_nation,
+    format_nation_card,
     found_nation,
     get_nation_by_chat,
     is_chat_peer,
     join_nation,
+    leave_nation,
+    list_citizens,
+    transfer_leadership,
 )
+from services.notify import notify_nation_chat
 from services.player import get_or_create_player
 
-# peer_id + user_id — чтобы в беседе не пересекались состояния игроков
 _pending_found: set[tuple[int, int]] = set()
+_pending_text: dict[tuple[int, int], str] = {}
 
 RESERVED = {
-    "старт",
-    "начать",
-    "меню",
-    "📋 меню",
-    "профиль",
-    "👤 профиль",
-    "работа",
-    "💼 работа",
-    "страна",
-    "🏛 страна",
-    "моя страна",
-    "война",
-    "⚔ война",
-    "рейд",
-    "⚔ рейд",
-    "топ",
-    "топ стран",
-    "🏆 топ стран",
-    "топ игроков",
-    "💰 топ игроков",
-    "основать",
-    "основать страну",
-    "🏗 основать страну",
-    "вступить",
-    "➕ вступить",
-    "отмена",
-    "❌ отмена",
-    "инфо страны",
-    "ℹ️ инфо страны",
-    "нужна беседа",
-    "ℹ️ нужна беседа",
+    "старт", "начать", "меню", "📋 меню", "профиль", "👤 профиль",
+    "работа", "💼 работа", "работы", "страна", "🏛 страна", "моя страна",
+    "война", "⚔ война", "рейд", "топ", "топ стран", "🏆 топ стран",
+    "топ игроков", "💰 топ игроков", "основать", "основать страну",
+    "🏗 основать страну", "вступить", "➕ вступить", "отмена", "❌ отмена",
+    "ежедневка", "🎁 ежедневка", "инвайт", "📨 инвайт", "выйти", "🚪 выйти",
 }
 
 
 def register(bot: Bot) -> None:
     @bot.on.message(
-        func=match_cmd("nation", "страна", "🏛 страна", "моя страна", "ℹ️ инфо страны", "инфо страны")
+        func=match_cmd(
+            "nation", "страна", "🏛 страна", "моя страна", "ℹ️ инфо страны", "инфо страны"
+        )
     )
     async def nation_menu(message: Message):
         name = await resolve_name(message)
@@ -63,40 +57,31 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             has_nation = bool(player.nation_id)
-            is_leader = bool(
-                player.nation and player.nation.leader_id == player.vk_id
-            )
+            is_leader = bool(player.nation and player.nation.leader_id == player.vk_id)
 
             if player.nation:
                 citizens = await count_citizens(session, player.nation.id)
-                text = (
-                    f"🏛 {player.nation.flag_emoji} {player.nation.name}\n"
-                    f"💰 Казна: {player.nation.treasury}\n"
-                    f"👥 Граждан: {citizens}\n"
-                    f"{'👑 Ты лидер' if is_leader else 'Статус: гражданин'}"
-                )
+                text = format_nation_card(player.nation, citizens)
+                if is_leader:
+                    text += "\n👑 Ты лидер"
             else:
                 chat_nation = (
                     await get_nation_by_chat(session, message.peer_id) if in_chat else None
                 )
                 if chat_nation:
                     text = (
-                        f"В этой беседе уже есть страна "
-                        f"«{chat_nation.flag_emoji} {chat_nation.name}».\n"
-                        f"Нажми «Вступить», чтобы стать гражданином."
+                        f"В беседе: {chat_nation.flag_emoji} {chat_nation.name}\n"
+                        "Нажми «Вступить»."
                     )
                 elif in_chat:
                     text = (
-                        "В этой беседе ещё нет государства.\n"
-                        f"Основание стоит {config.NATION_FOUND_COST} крон.\n"
+                        f"Страны ещё нет. Основание: {config.NATION_FOUND_COST} крон.\n"
                         "Нажми «Основать страну»."
                     )
                 else:
                     text = (
-                        "Страну можно основать только в беседе.\n"
-                        "1) Создай беседу VK\n"
-                        "2) Добавь сообщество «Империя чатов»\n"
-                        "3) Напиши здесь «Страна» → «Основать»"
+                        "Страну основывают только в беседе.\n"
+                        "Добавь сообщество в чат → Страна → Основать."
                     )
 
             await message.answer(
@@ -106,9 +91,7 @@ def register(bot: Bot) -> None:
                 ).get_json(),
             )
 
-    @bot.on.message(
-        func=match_cmd("join_nation", "➕ вступить", "вступить")
-    )
+    @bot.on.message(func=match_cmd("join_nation", "➕ вступить", "вступить"))
     async def join_handler(message: Message):
         name = await resolve_name(message)
         async with SessionLocal() as session:
@@ -118,10 +101,15 @@ def register(bot: Bot) -> None:
             except NationError as e:
                 await message.answer(e.message, keyboard=main_keyboard().get_json())
                 return
-
+            welcome = nation.welcome or "Добро пожаловать!"
+            await notify_nation_chat(
+                message.ctx_api,
+                nation.chat_peer_id,
+                f"➕ {player.name} вступил в {nation.flag_emoji} {nation.name}!",
+            )
             await message.answer(
-                f"Добро пожаловать в {nation.flag_emoji} {nation.name}!\n"
-                f"Теперь 10% с работы идёт в казну страны.",
+                f"{welcome}\nТы в {nation.flag_emoji} {nation.name}.\n"
+                f"Налог страны: {int((nation.tax_rate or 0.1)*100)}%",
                 keyboard=main_keyboard().get_json(),
             )
 
@@ -131,46 +119,139 @@ def register(bot: Bot) -> None:
     async def found_start(message: Message):
         if not is_chat_peer(message.peer_id):
             await message.answer(
-                "Основать страну можно только в беседе.\n"
-                "Добавь сообщество в чат и нажми «Основать» там.",
+                "Основать страну можно только в беседе.",
                 keyboard=main_keyboard().get_json(),
             )
             return
-
         _pending_found.add((message.peer_id, message.from_id))
         await message.answer(
-            f"Введи название страны (2–32 символа).\n"
-            f"Стоимость: {config.NATION_FOUND_COST} крон.\n"
-            f"Напиши «Отмена» чтобы выйти.",
+            f"Название страны (2–32 символа).\nЦена: {config.NATION_FOUND_COST} крон.",
             keyboard=cancel_keyboard().get_json(),
         )
+
+    @bot.on.message(func=match_cmd("leave_nation", "🚪 выйти", "выйти"))
+    async def leave_handler(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                msg = await leave_nation(session, player)
+            except NationError as e:
+                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                return
+            await message.answer(msg, keyboard=main_keyboard().get_json())
+
+    @bot.on.message(func=match_cmd("dissolve_nation", "🗑 распустить", "распустить"))
+    async def dissolve_ask(message: Message):
+        await message.answer(
+            "⚠ Распустить страну навсегда?\nВсе граждане станут без страны (кулдаун 24ч).",
+            keyboard=confirm_dissolve_keyboard().get_json(),
+        )
+
+    @bot.on.message(func=payload_cmd("dissolve_confirm"))
+    async def dissolve_do(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                nation_name = await dissolve_nation(session, player)
+            except NationError as e:
+                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                return
+            await add_event(session, "dissolve", f"Страна {nation_name} распущена")
+            await message.answer(
+                f"🗑 Страна {nation_name} удалена. Беседу можно основать заново.",
+                keyboard=main_keyboard().get_json(),
+            )
+
+    @bot.on.message(func=match_cmd("transfer_menu", "👑 трон", "трон", "передать трон"))
+    async def transfer_menu(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            if not player.nation or player.nation.leader_id != player.vk_id:
+                await message.answer("Только лидер.", keyboard=main_keyboard().get_json())
+                return
+            citizens = [
+                c
+                for c in await list_citizens(session, player.nation.id, 8)
+                if c.vk_id != player.vk_id
+            ]
+            if not citizens:
+                await message.answer(
+                    "Некому передавать трон (ты один).",
+                    keyboard=main_keyboard().get_json(),
+                )
+                return
+            await message.answer(
+                "Выбери нового лидера:",
+                keyboard=citizens_keyboard(citizens).get_json(),
+            )
+
+    @bot.on.message(func=payload_cmd("transfer_to"))
+    async def transfer_do(message: Message):
+        payload = message.get_payload_json() or {}
+        target_id = int(payload.get("vk_id") or 0)
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                target = await transfer_leadership(session, player, target_id)
+            except NationError as e:
+                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                return
+            await notify_nation_chat(
+                message.ctx_api,
+                player.nation.chat_peer_id if player.nation else message.peer_id,
+                f"👑 Новый лидер: {target.name}!",
+            )
+            await message.answer(
+                f"Трон передан: {target.name}",
+                keyboard=main_keyboard().get_json(),
+            )
 
     @bot.on.message(func=match_cmd("cancel", "❌ отмена", "отмена"))
     async def cancel_found(message: Message):
         key = (message.peer_id, message.from_id)
-        if key in _pending_found:
-            _pending_found.discard(key)
-            await message.answer("Отменено.", keyboard=main_keyboard().get_json())
-            return
-        await message.answer("Ок.", keyboard=main_keyboard().get_json())
+        _pending_found.discard(key)
+        _pending_text.pop(key, None)
+        await message.answer("Отменено.", keyboard=main_keyboard().get_json())
 
     @bot.on.message(func=match_cmd("need_chat", "ℹ️ нужна беседа", "нужна беседа"))
     async def need_chat(message: Message):
         await message.answer(
-            "Добавь бота (сообщество) в беседу VK и пиши команды там.",
+            "Добавь сообщество в беседу VK.",
             keyboard=main_keyboard().get_json(),
         )
 
     @bot.on.message(blocking=False)
     async def found_finish(message: Message):
         key = (message.peer_id, message.from_id)
-        if key not in _pending_found:
-            return
-
         text = (message.text or "").strip()
         if not text:
             return
 
+        # customize text input
+        if key in _pending_text:
+            field = _pending_text.pop(key)
+            name = await resolve_name(message)
+            async with SessionLocal() as session:
+                player = await get_or_create_player(session, message.from_id, name)
+                try:
+                    result = await set_field(session, player, field, text)
+                except CustomizeError as e:
+                    _pending_text[key] = field
+                    await message.answer(e.message, keyboard=cancel_keyboard().get_json())
+                    return
+                cost_line = f"\n−{result['cost']} крон" if result["cost"] else ""
+                await message.answer(
+                    f"Сохранено ({field}){cost_line}",
+                    keyboard=customize_keyboard().get_json(),
+                )
+            return
+
+        if key not in _pending_found:
+            return
         if text.casefold() in {r.casefold() for r in RESERVED}:
             return
         if (message.get_payload_json() or {}).get("cmd"):
@@ -187,9 +268,24 @@ def register(bot: Bot) -> None:
                 await message.answer(e.message, keyboard=cancel_keyboard().get_json())
                 return
 
+            await add_event(
+                session,
+                "found",
+                f"Основана {nation.flag_emoji} {nation.name}",
+                str(nation.id),
+            )
+            await notify_nation_chat(
+                message.ctx_api,
+                nation.chat_peer_id,
+                f"🎉 Основана страна {nation.flag_emoji} {nation.name}!\nЛидер: {player.name}",
+            )
             await message.answer(
-                f"🎉 Основана страна {nation.flag_emoji} {nation.name}!\n"
-                f"Ты лидер. Зови граждан кнопкой «Вступить».\n"
-                f"💰 Казна: {nation.treasury}",
+                f"🎉 Основана {nation.flag_emoji} {nation.name}!\n"
+                f"Оформи: 🎨 · Зови друзей: 📨",
                 keyboard=main_keyboard().get_json(),
             )
+
+
+# shared pending for customize module
+def get_pending_text() -> dict:
+    return _pending_text

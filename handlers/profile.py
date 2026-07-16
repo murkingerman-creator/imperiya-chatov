@@ -25,15 +25,17 @@ def register(bot: Bot) -> None:
 
             next_e = energy_next_in_minutes(player)
             energy_hint = (
-                "энергия полная"
+                "полная"
                 if next_e is None
-                else f"+1 энергия через ~{next_e} мин"
+                else f"+1 через ~{next_e} мин"
             )
 
             text = (
                 f"👤 {player.name}\n"
                 f"💰 Кроны: {player.crowns}\n"
                 f"⚡ Энергия: {player.energy}/{config.MAX_ENERGY} ({energy_hint})\n"
+                f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"
+                f"📨 Код: {player.invite_code}\n"
                 f"🏛 Страна: {nation_line}"
             )
             await message.answer(text, keyboard=main_keyboard().get_json())

@@ -2,7 +2,7 @@ from vkbottle.bot import Bot, Message
 
 from bot.keyboards import main_keyboard
 from handlers.common import MENU_TEXT, ensure_player
-from handlers.rules import payload_cmd, text_in
+from handlers.rules import match_cmd, payload_cmd
 
 START_WORDS = {"начать", "старт", "start", "меню", "📋 меню", "/start"}
 
@@ -28,8 +28,4 @@ def register(bot: Bot) -> None:
 
     @bot.on.message(payload={"command": "start"})
     async def start_command_payload(message: Message):
-        await _send_menu(message)
-
-    @bot.on.message(payload={"cmd": "start"})
-    async def start_cmd_payload(message: Message):
         await _send_menu(message)
