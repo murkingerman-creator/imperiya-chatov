@@ -1,0 +1,4 @@
+vkbottle>=4.3.12
+sqlalchemy[asyncio]>=2.0.36
+aiosqlite>=0.20.0
+python-dotenv>=1.0.1
