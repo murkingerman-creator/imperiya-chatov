@@ -221,22 +221,37 @@ async def dissolve_nation(session: AsyncSession, leader: Player) -> str:
         raise NationError("Страна не найдена.")
     if nation.leader_id != leader.vk_id:
         raise NationError("Распустить страну может только лидер.")
+    return await dissolve_nation_by_id(session, nation.id)
+
+
+async def dissolve_nation_by_id(session: AsyncSession, nation_id: int) -> str:
+    nation = await get_nation_by_id(session, nation_id)
+    if not nation:
+        raise NationError("Страна не найдена.")
 
     nation_name = f"{nation.flag_emoji} {nation.name}"
-    nation_id = nation.id
 
     await session.execute(
         update(Player)
         .where(Player.nation_id == nation_id)
         .values(nation_id=None, nation_left_at=utcnow())
     )
-    await session.execute(delete(WarLog).where(
-        (WarLog.attacker_nation_id == nation_id) | (WarLog.defender_nation_id == nation_id)
-    ))
+    await session.execute(
+        delete(WarLog).where(
+            (WarLog.attacker_nation_id == nation_id)
+            | (WarLog.defender_nation_id == nation_id)
+        )
+    )
     await session.delete(nation)
     await session.commit()
     return nation_name
 
+
+async def dissolve_nation_by_name(session: AsyncSession, name: str) -> str:
+    nation = await get_nation_by_name(session, name)
+    if not nation:
+        raise NationError(f"Страна «{name}» не найдена.")
+    return await dissolve_nation_by_id(session, nation.id)
 
 async def list_citizens(session: AsyncSession, nation_id: int, limit: int = 6) -> list[Player]:
     result = await session.execute(

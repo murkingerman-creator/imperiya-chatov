@@ -1,5 +1,7 @@
 from vkbottle.bot import Message
 
+from bot.config import is_admin
+from bot.keyboards import main_keyboard
 from db.database import SessionLocal
 from services.player import get_or_create_player
 
@@ -14,6 +16,10 @@ MENU_TEXT = (
     "• ⚔ Война — рейды лидера\n\n"
     "Добавь бота в беседу, чтобы основать страну."
 )
+
+
+def user_keyboard(vk_id: int) -> str:
+    return main_keyboard(is_admin=is_admin(vk_id)).get_json()
 
 
 async def resolve_name(message: Message) -> str:

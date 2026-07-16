@@ -1,20 +1,22 @@
 from vkbottle.bot import Bot, Message
 
-from bot.keyboards import main_keyboard
-from handlers.common import MENU_TEXT, ensure_player
+from bot.config import is_admin
+from bot.keyboards import admin_keyboard
+from handlers.common import MENU_TEXT, ensure_player, user_keyboard
 from handlers.rules import match_cmd, payload_cmd
-
-START_WORDS = {"начать", "старт", "start", "меню", "📋 меню", "/start"}
 
 
 def _is_start_text(message: Message) -> bool:
     text = (message.text or "").strip().casefold()
-    return text in {w.casefold() for w in START_WORDS}
+    return text in {"начать", "старт", "start", "меню", "📋 меню", "/start"}
 
 
 async def _send_menu(message: Message) -> None:
     await ensure_player(message)
-    await message.answer(MENU_TEXT, keyboard=main_keyboard().get_json())
+    text = MENU_TEXT
+    if is_admin(message.from_id):
+        text += "\n\n🛠 Тебе доступна админка."
+    await message.answer(text, keyboard=user_keyboard(message.from_id))
 
 
 def register(bot: Bot) -> None:

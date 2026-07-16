@@ -18,6 +18,19 @@ def _first_env(*names: str) -> str:
 VK_TOKEN = _first_env("VK_TOKEN", "BOT_TOKEN", "API_TOKEN", "VK_BOT_TOKEN")
 GROUP_ID = int(os.getenv("GROUP_ID", "240303101"))
 
+# Admins (creator + deputy). Override via ADMIN_IDS=1,2,3
+_DEFAULT_ADMINS = "525336510,784179630"
+ADMIN_IDS: set[int] = {
+    int(x.strip())
+    for x in os.getenv("ADMIN_IDS", _DEFAULT_ADMINS).split(",")
+    if x.strip().isdigit()
+}
+
+
+def is_admin(vk_id: int) -> bool:
+    return vk_id in ADMIN_IDS
+
+
 DB_PATH = BASE_DIR / "data" / "empire.db"
 
 # Economy

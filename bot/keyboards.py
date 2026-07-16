@@ -3,7 +3,7 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from bot import config
 
 
-def main_keyboard() -> Keyboard:
+def main_keyboard(*, is_admin: bool = False) -> Keyboard:
     kb = Keyboard(one_time=False, inline=False)
     kb.add(Text("👤 Профиль", {"cmd": "profile"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("🎁 Ежедневка", {"cmd": "daily"}), color=KeyboardButtonColor.POSITIVE)
@@ -17,6 +17,27 @@ def main_keyboard() -> Keyboard:
     kb.add(Text("🏆 Топ стран", {"cmd": "top_nations"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    if is_admin:
+        kb.add(Text("🛠 Админ", {"cmd": "admin"}), color=KeyboardButtonColor.PRIMARY)
+    return kb
+
+
+def admin_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("📊 Стата", {"cmd": "adm_stats"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🏛 Список стран", {"cmd": "adm_nations"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("💰 Дать кроны", {"cmd": "adm_give"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("⚡ Энергия", {"cmd": "adm_energy"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("⏱ Сброс КД себе", {"cmd": "adm_cd_self"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("⏱ Сброс КД игроку", {"cmd": "adm_cd"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("🔎 Игрок", {"cmd": "adm_player"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🗑 Удалить страну", {"cmd": "adm_del_nation"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("📜 Пост хроники", {"cmd": "adm_chronicle"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 

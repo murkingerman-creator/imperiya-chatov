@@ -1,8 +1,9 @@
-from handlers import customize, daily, invite, nation, profile, start, tops, war, work
+from handlers import admin, customize, daily, invite, nation, profile, start, tops, war, work
 
 
 def register_all(bot) -> None:
     start.register(bot)
+    admin.register(bot)
     profile.register(bot)
     daily.register(bot)
     work.register(bot)
@@ -10,4 +11,4 @@ def register_all(bot) -> None:
     war.register(bot)
     invite.register(bot)
     customize.register(bot)
-    nation.register(bot)  # pending text/found last (blocking=False catch-up)
+    nation.register(bot)

@@ -59,14 +59,20 @@ async def maybe_post_daily_chronicle(api, session: AsyncSession) -> bool:
     if last == today:
         return False
 
+    await force_post_chronicle(api, session)
+    return True
+
+
+async def force_post_chronicle(api, session: AsyncSession) -> str:
+    """Принудительный пост хроники (админка)."""
     text = await build_digest(session)
     await post_wall(api, text)
+    today = utcnow().astimezone(MSK).strftime("%Y-%m-%d")
     await set_meta(session, "last_chronicle_post_date", today)
-    # trim old events
     result = await session.execute(
         select(ChronicleEvent).order_by(ChronicleEvent.id.desc()).offset(50)
     )
     for old in result.scalars().all():
         await session.delete(old)
     await session.commit()
-    return True
+    return text
