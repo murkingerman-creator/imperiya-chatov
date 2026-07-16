@@ -3,12 +3,13 @@ from vkbottle.bot import Bot, Message
 from bot.keyboards import main_keyboard
 from db.database import SessionLocal
 from handlers.common import resolve_name
+from handlers.rules import text_in
 from services.economy import WorkError, do_work
 from services.player import get_or_create_player
 
 
 def register(bot: Bot) -> None:
-    @bot.on.message(text=["работа", "💼 работа", "работать"])
+    @bot.on.message(func=text_in("работа", "💼 работа", "работать"))
     async def work_handler(message: Message):
         name = await resolve_name(message)
         async with SessionLocal() as session:
