@@ -19,10 +19,6 @@ def _is_invite_cmd(message: Message) -> bool:
 def register(bot: Bot) -> None:
     @bot.on.message(func=match_cmd("invite", "инвайт", "📨 инвайт", "пригласить"))
     async def invite_info(message: Message):
-        # plain "инвайт" without code
-        text = (message.text or "").strip()
-        if " " in text.strip():
-            return
         name = await resolve_name(message)
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)

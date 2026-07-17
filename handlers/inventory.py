@@ -4,6 +4,7 @@ from bot.keyboards import (
     bag_items_keyboard,
     bag_keyboard,
     charge_activate_keyboard,
+    confirm_sell_bot_keyboard,
     item_actions_keyboard,
     main_keyboard,
     unequip_keyboard,
@@ -120,6 +121,23 @@ def register(bot: Bot) -> None:
 
     @bot.on.message(func=payload_cmd("bag_sell"))
     async def bag_sell(message: Message):
+        payload = message.get_payload_json() or {}
+        item_id = str(payload.get("id") or "")
+        it = cat.get_item(item_id)
+        if not it:
+            await message.answer("Предмет не найден.", keyboard=bag_keyboard().get_json())
+            return
+        price = cat.SELL_PRICE.get(it["rarity"], 10)
+        await message.answer(
+            f"💰 Продажа боту\n"
+            f"{cat.format_item(it)}\n"
+            f"Цена: {price} крон\n\n"
+            f"Точно продать?",
+            keyboard=confirm_sell_bot_keyboard(item_id, price).get_json(),
+        )
+
+    @bot.on.message(func=payload_cmd("bag_sell_confirm"))
+    async def bag_sell_confirm(message: Message):
         payload = message.get_payload_json() or {}
         item_id = str(payload.get("id") or "")
         name = await resolve_name(message)

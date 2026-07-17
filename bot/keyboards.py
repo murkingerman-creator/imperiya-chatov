@@ -353,6 +353,22 @@ def item_actions_keyboard(item_id: str, rarity: str) -> Keyboard:
     return kb
 
 
+def confirm_sell_bot_keyboard(item_id: str, price: int) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    kb.add(
+        Text(
+            f"Да, продать за {price}",
+            {"cmd": "bag_sell_confirm", "id": item_id},
+        ),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(
+        Text("❌ Отмена", {"cmd": "bag_item", "id": item_id}),
+        color=KeyboardButtonColor.NEGATIVE,
+    )
+    return kb
+
+
 def market_menu_keyboard() -> Keyboard:
     kb = Keyboard(one_time=False, inline=False)
     kb.add(Text("🛒 Витрина", {"cmd": "market", "page": 0}), color=KeyboardButtonColor.POSITIVE)
