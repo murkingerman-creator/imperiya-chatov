@@ -135,8 +135,12 @@ def register(bot: Bot) -> None:
         if not await _require(message):
             return
         _pending[(message.peer_id, message.from_id)] = "del_nation"
+        async with SessionLocal() as session:
+            listing = await admin_svc.list_nations_short(session)
         await message.answer(
-            "Точное название страны для удаления:",
+            f"{listing}\n\n"
+            "Напиши название или id страны для удаления.\n"
+            "Примеры: Тест  |  1  |  id=1",
             keyboard=cancel_keyboard().get_json(),
         )
 

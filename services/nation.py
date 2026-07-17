@@ -62,12 +62,38 @@ async def get_nation_by_id(session: AsyncSession, nation_id: int) -> Nation | No
 
 
 async def get_nation_by_name(session: AsyncSession, name: str) -> Nation | None:
+    needle = name.strip().casefold()
+    if not needle:
+        return None
+    # SQLite lower() не умеет кириллицу — сравниваем в Python
     result = await session.execute(
-        select(Nation)
-        .options(selectinload(Nation.players))
-        .where(func.lower(Nation.name) == name.lower().strip())
+        select(Nation).options(selectinload(Nation.players))
     )
-    return result.scalar_one_or_none()
+    for nation in result.scalars().all():
+        if nation.name.casefold() == needle:
+            return nation
+    return None
+
+
+async def find_nations_fuzzy(session: AsyncSession, query: str) -> list[Nation]:
+    """Точное имя, id=N или частичное совпадение."""
+    q = query.strip()
+    if not q:
+        return []
+    if q.isdigit():
+        nation = await get_nation_by_id(session, int(q))
+        return [nation] if nation else []
+    if q.lower().startswith("id=") and q[3:].strip().isdigit():
+        nation = await get_nation_by_id(session, int(q[3:].strip()))
+        return [nation] if nation else []
+
+    exact = await get_nation_by_name(session, q)
+    if exact:
+        return [exact]
+
+    needle = q.casefold()
+    result = await session.execute(select(Nation))
+    return [n for n in result.scalars().all() if needle in n.name.casefold()]
 
 
 async def count_citizens(session: AsyncSession, nation_id: int) -> int:
@@ -248,10 +274,18 @@ async def dissolve_nation_by_id(session: AsyncSession, nation_id: int) -> str:
 
 
 async def dissolve_nation_by_name(session: AsyncSession, name: str) -> str:
-    nation = await get_nation_by_name(session, name)
-    if not nation:
-        raise NationError(f"Страна «{name}» не найдена.")
-    return await dissolve_nation_by_id(session, nation.id)
+    matches = await find_nations_fuzzy(session, name)
+    if not matches:
+        raise NationError(
+            f"Страна «{name}» не найдена.\n"
+            "Открой «Список стран» и удали по id, например: 1"
+        )
+    if len(matches) > 1:
+        lines = ["Найдено несколько, уточни id или точное имя:"]
+        for n in matches[:10]:
+            lines.append(f"• id={n.id} {n.flag_emoji} {n.name}")
+        raise NationError("\n".join(lines))
+    return await dissolve_nation_by_id(session, matches[0].id)
 
 async def list_citizens(session: AsyncSession, nation_id: int, limit: int = 6) -> list[Player]:
     result = await session.execute(
