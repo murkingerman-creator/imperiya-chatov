@@ -90,6 +90,11 @@ async def reset_cooldowns(session: AsyncSession, vk_id: int) -> Player:
     p.last_mine_at = None
     p.last_market_at = None
     p.last_guard_at = None
+    p.last_fish_at = None
+    p.last_farm_at = None
+    p.last_forge_at = None
+    p.last_tavern_at = None
+    p.last_smuggle_at = None
     p.last_daily_at = None
     p.nation_left_at = None
     await session.commit()

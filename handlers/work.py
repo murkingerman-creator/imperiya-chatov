@@ -1,5 +1,6 @@
 from vkbottle.bot import Bot, Message
 
+from bot import config
 from bot.keyboards import jobs_keyboard, main_keyboard, minigame_keyboard
 from db.database import SessionLocal
 from handlers.common import resolve_name
@@ -13,12 +14,12 @@ def register(bot: Bot) -> None:
     @bot.on.message(func=match_cmd("jobs", "работа", "💼 работа", "работы"))
     async def jobs_menu(message: Message):
         await message.answer(
-            "💼 Выбери работу (у каждой свой кулдаун и мини-игра):\n"
-            "⛏ Шахта — дольше, стабильно\n"
-            "🛒 Рынок — чаще, риск\n"
-            "🛡 Охрана — редко, жирно + казна\n"
-            "🕶 Контрабанда — ×3 или тюрьма на час\n"
-            "С работ падает лут в 🎒 Сумку.",
+            "💼 Работы (у каждой свой КД и мини-игра):\n"
+            "🍺 Таверна ~10м · 🎣 Рыбалка ~12м · 🌾 Поле ~16м\n"
+            "🛒 Рынок ~18м · 🔥 Кузня ~28м · ⛏ Шахта ~35м\n"
+            "🛡 Охрана ~40м (+казне) · 🕶 Контрабанда ~35м (риск)\n"
+            f"⚡ Энергия до {config.MAX_ENERGY}, реген быстрее.\n"
+            "Лут → 🎒 Сумка.",
             keyboard=jobs_keyboard().get_json(),
         )
 

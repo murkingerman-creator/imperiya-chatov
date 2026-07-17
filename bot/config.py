@@ -35,8 +35,8 @@ DB_PATH = BASE_DIR / "data" / "empire.db"
 
 # Economy
 START_CROWNS = 100
-MAX_ENERGY = 5
-ENERGY_REGEN_MINUTES = 20
+MAX_ENERGY = 8
+ENERGY_REGEN_MINUTES = 12
 TAX_RATE = 0.10  # fallback
 NATION_FOUND_COST = 50
 
@@ -45,32 +45,71 @@ DAILY_BASE = 40
 DAILY_STREAK_BONUS = 10
 DAILY_STREAK_CAP = 7
 
-# Jobs
+# Jobs — короткие КД, больше вариантов (чтобы не «ждать-ждать»)
 JOBS = {
     "mine": {
         "title": "⛏ Шахта",
-        "cooldown_min": 90,
-        "reward_min": 45,
-        "reward_max": 90,
+        "cooldown_min": 35,
+        "reward_min": 40,
+        "reward_max": 85,
         "success_mult": 1.0,
         "fail_mult": 0.4,
+        "loot_pool": "mine",
     },
     "market": {
         "title": "🛒 Рынок",
-        "cooldown_min": 45,
-        "reward_min": 25,
-        "reward_max": 50,
+        "cooldown_min": 18,
+        "reward_min": 22,
+        "reward_max": 48,
         "success_mult": 1.3,
         "fail_mult": 0.6,
+        "loot_pool": "market",
     },
     "guard": {
         "title": "🛡 Охрана",
-        "cooldown_min": 120,
-        "reward_min": 60,
-        "reward_max": 120,
+        "cooldown_min": 40,
+        "reward_min": 50,
+        "reward_max": 100,
         "success_mult": 1.2,
         "fail_mult": 0.5,
         "treasury_bonus": 10,
+        "loot_pool": "guard",
+    },
+    "fish": {
+        "title": "🎣 Рыбалка",
+        "cooldown_min": 12,
+        "reward_min": 15,
+        "reward_max": 35,
+        "success_mult": 1.2,
+        "fail_mult": 0.5,
+        "loot_pool": "mine",
+    },
+    "farm": {
+        "title": "🌾 Поле",
+        "cooldown_min": 16,
+        "reward_min": 18,
+        "reward_max": 40,
+        "success_mult": 1.15,
+        "fail_mult": 0.55,
+        "loot_pool": "market",
+    },
+    "forge": {
+        "title": "🔥 Кузня",
+        "cooldown_min": 28,
+        "reward_min": 35,
+        "reward_max": 75,
+        "success_mult": 1.25,
+        "fail_mult": 0.45,
+        "loot_pool": "guard",
+    },
+    "tavern": {
+        "title": "🍺 Таверна",
+        "cooldown_min": 10,
+        "reward_min": 12,
+        "reward_max": 28,
+        "success_mult": 1.35,
+        "fail_mult": 0.5,
+        "loot_pool": "market",
     },
 }
 
@@ -95,7 +134,7 @@ RAID_TREASURY_SHARE = 0.70
 RAID_NIGHT_COOLDOWN_MINUTES = 15  # during raid night
 
 # Smuggle
-SMUGGLE_COOLDOWN_MIN = 60
+SMUGGLE_COOLDOWN_MIN = 35
 SMUGGLE_SUCCESS_CHANCE = 0.45
 SMUGGLE_REWARD_MIN = 80
 SMUGGLE_REWARD_MAX = 200

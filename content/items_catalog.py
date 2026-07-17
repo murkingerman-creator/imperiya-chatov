@@ -343,7 +343,15 @@ def format_buffs(it: dict) -> str:
     if it.get("desc"):
         lines.append(it["desc"])
     p = it.get("passives") or {}
-    job_names = {"mine": "шахта", "market": "рынок", "guard": "охрана"}
+    job_names = {
+        "mine": "шахта",
+        "market": "рынок",
+        "guard": "охрана",
+        "fish": "рыбалка",
+        "farm": "поле",
+        "forge": "кузня",
+        "tavern": "таверна",
+    }
     if p.get("work_mult"):
         lines.append(f"• Все работы: {p['work_mult']:+.0%}")
     for job, bonus in (p.get("job_bonus") or {}).items():

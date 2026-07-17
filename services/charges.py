@@ -38,6 +38,10 @@ async def activate_manual_charge(
         player.last_mine_at = None
         player.last_market_at = None
         player.last_guard_at = None
+        player.last_fish_at = None
+        player.last_farm_at = None
+        player.last_forge_at = None
+        player.last_tavern_at = None
         player.last_smuggle_at = None
         player.last_work_at = None
         await session.commit()

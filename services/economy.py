@@ -30,7 +30,18 @@ _sessions: dict[str, MiniSession] = {}
 
 
 def _job_last_attr(job: str) -> str:
-    return {"mine": "last_mine_at", "market": "last_market_at", "guard": "last_guard_at"}[job]
+    mapping = {
+        "mine": "last_mine_at",
+        "market": "last_market_at",
+        "guard": "last_guard_at",
+        "fish": "last_fish_at",
+        "farm": "last_farm_at",
+        "forge": "last_forge_at",
+        "tavern": "last_tavern_at",
+    }
+    if job not in mapping:
+        raise WorkError("Неизвестная работа.")
+    return mapping[job]
 
 
 def check_can_start_job(player: Player, job: str, *, skip_cd: bool = False) -> dict:
@@ -44,7 +55,7 @@ def check_can_start_job(player: Player, job: str, *, skip_cd: bool = False) -> d
     spec = config.JOBS[job]
     now = utcnow()
     if not skip_cd:
-        last = ensure_aware(getattr(player, _job_last_attr(job)))
+        last = ensure_aware(getattr(player, _job_last_attr(job), None))
         if last:
             ready_at = last + timedelta(minutes=spec["cooldown_min"])
             if now < ready_at:
@@ -57,46 +68,76 @@ def check_can_start_job(player: Player, job: str, *, skip_cd: bool = False) -> d
     return spec
 
 
+def _build_minigame(job: str) -> tuple[str, str, list[tuple[str, str]], dict]:
+    """prompt, correct, buttons, meta"""
+    if job == "mine":
+        correct = random.choice(["A", "B", "C"])
+        return (
+            "⛏ Шахта: в какой штольне руда?\nВыбери A / B / C.",
+            correct,
+            [("Штольня A", "A"), ("Штольня B", "B"), ("Штольня C", "C")],
+            {},
+        )
+    if job == "market":
+        rate = random.randint(40, 80)
+        correct = random.choice(["up", "down"])
+        return (
+            f"🛒 Рынок: курс сейчас {rate}.\nКуда пойдёт цена?",
+            correct,
+            [("📈 Выше", "up"), ("📉 Ниже", "down")],
+            {"rate": rate},
+        )
+    if job == "guard":
+        faces = ["🙂", "😎", "🥸"]
+        spy_idx = random.randint(0, 2)
+        return (
+            f"🛡 Охрана: кто шпион?\n1) {faces[0]}  2) {faces[1]}  3) {faces[2]}",
+            str(spy_idx),
+            [(f"1 {faces[0]}", "0"), (f"2 {faces[1]}", "1"), (f"3 {faces[2]}", "2")],
+            {"faces": faces},
+        )
+    if job == "fish":
+        correct = random.choice(["left", "right", "deep"])
+        return (
+            "🎣 Рыбалка: где клюёт?\nВыбери место.",
+            correct,
+            [("⬅ Слева", "left"), ("➡ Справа", "right"), ("⬇ Глубже", "deep")],
+            {},
+        )
+    if job == "farm":
+        correct = random.choice(["water", "weed", "harvest"])
+        return (
+            "🌾 Поле: что сделать сейчас?",
+            correct,
+            [("💧 Полить", "water"), ("🌿 Прополоть", "weed"), ("🧺 Собрать", "harvest")],
+            {},
+        )
+    if job == "forge":
+        correct = random.choice(["soft", "hard", "quench"])
+        return (
+            "🔥 Кузня: ударь правильно!",
+            correct,
+            [("🔨 Легко", "soft"), ("⚔ Сильно", "hard"), ("❄ Закалить", "quench")],
+            {},
+        )
+    if job == "tavern":
+        correct = random.choice(["ale", "song", "deal"])
+        return (
+            "🍺 Таверна: чем заработать чаевые?",
+            correct,
+            [("🍺 Эль", "ale"), ("🎵 Песня", "song"), ("🃏 Сделка", "deal")],
+            {},
+        )
+    raise WorkError("Неизвестная работа.")
+
+
 def start_minigame(
     player: Player, job: str, *, skip_cd: bool = False, charge_flags: dict | None = None
 ) -> dict:
     check_can_start_job(player, job, skip_cd=skip_cd)
     token = secrets.token_hex(4)
     now_ts = utcnow().timestamp()
-
-    if job == "mine":
-        options = ["A", "B", "C"]
-        correct = random.choice(options)
-        prompt = (
-            "⛏ Шахта: в какой штольне руда?\n"
-            "Выбери A / B / C за 60 секунд."
-        )
-        buttons = [("Штольня A", "A"), ("Штольня B", "B"), ("Штольня C", "C")]
-        meta = {}
-    elif job == "market":
-        rate = random.randint(40, 80)
-        correct = random.choice(["up", "down"])
-        prompt = (
-            f"🛒 Рынок: курс сейчас {rate}.\n"
-            "Куда пойдёт цена — выше или ниже?"
-        )
-        buttons = [("📈 Выше", "up"), ("📉 Ниже", "down")]
-        meta = {"rate": rate}
-    else:  # guard
-        faces = ["🙂", "😎", "🥸"]
-        spy_idx = random.randint(0, 2)
-        correct = str(spy_idx)
-        prompt = (
-            "🛡 Охрана: кто шпион?\n"
-            f"1) {faces[0]}  2) {faces[1]}  3) {faces[2]}"
-        )
-        buttons = [
-            (f"1 {faces[0]}", "0"),
-            (f"2 {faces[1]}", "1"),
-            (f"3 {faces[2]}", "2"),
-        ]
-        meta = {"faces": faces}
-
+    prompt, correct, buttons, meta = _build_minigame(job)
     meta.update(charge_flags or {})
 
     for k, s in list(_sessions.items()):
@@ -230,10 +271,11 @@ async def finish_minigame(
     if quest_extra:
         quest = await on_job_done(session, player)
 
+    drop_pool = spec.get("loot_pool") or game.job
     drop = await grant_drop(
         session,
         player,
-        game.job,
+        drop_pool,
         success=success,
         job=game.job,
         event_key=event_key,
