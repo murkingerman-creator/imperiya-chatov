@@ -3,7 +3,7 @@ from vkbottle.bot import Bot, Message
 from bot.config import is_admin
 from bot.keyboards import admin_keyboard, cancel_keyboard
 from db.database import SessionLocal
-from handlers.common import resolve_name, user_keyboard
+from handlers.common import reply, resolve_name, user_keyboard
 from handlers.rules import match_cmd, payload_cmd
 from services import admin as admin_svc
 from services.admin import AdminError
@@ -30,7 +30,7 @@ def _guard(message: Message) -> str | None:
 async def _require(message: Message) -> bool:
     err = _guard(message)
     if err:
-        await message.answer(err, keyboard=user_keyboard(message.from_id))
+        await reply(message, err, keyboard=user_keyboard(message.from_id))
         return False
     return True
 
@@ -40,7 +40,7 @@ def register(bot: Bot) -> None:
     async def admin_menu(message: Message):
         if not await _require(message):
             return
-        await message.answer(
+        await reply(message, 
             "🛠 Админка\n"
             "Текстовые команды:\n"
             "• !дать ID СУММА\n"
@@ -57,7 +57,7 @@ def register(bot: Bot) -> None:
             return
         async with SessionLocal() as session:
             text = await admin_svc.stats(session)
-            await message.answer(text, keyboard=admin_keyboard().get_json())
+            await reply(message, text, keyboard=admin_keyboard().get_json())
 
     @bot.on.message(func=payload_cmd("adm_nations"))
     async def adm_nations(message: Message):
@@ -65,7 +65,7 @@ def register(bot: Bot) -> None:
             return
         async with SessionLocal() as session:
             text = await admin_svc.list_nations_short(session)
-            await message.answer(text, keyboard=admin_keyboard().get_json())
+            await reply(message, text, keyboard=admin_keyboard().get_json())
 
     @bot.on.message(func=payload_cmd("adm_cd_self"))
     async def adm_cd_self(message: Message):
@@ -74,7 +74,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             await get_or_create_player(session, message.from_id)
             p = await admin_svc.reset_cooldowns(session, message.from_id)
-            await message.answer(
+            await reply(message, 
                 f"Кулдауны сброшены для {p.name}",
                 keyboard=admin_keyboard().get_json(),
             )
@@ -85,7 +85,7 @@ def register(bot: Bot) -> None:
             return
         async with SessionLocal() as session:
             text = await force_post_chronicle(message.ctx_api, session)
-            await message.answer(
+            await reply(message, 
                 "📜 Хроника отправлена на стену группы.\n\n" + text[:800],
                 keyboard=admin_keyboard().get_json(),
             )
@@ -95,7 +95,7 @@ def register(bot: Bot) -> None:
         if not await _require(message):
             return
         _pending[(message.peer_id, message.from_id)] = "give"
-        await message.answer(
+        await reply(message, 
             "Формат: ID СУММА\nПример: 525336510 1000",
             keyboard=cancel_keyboard().get_json(),
         )
@@ -105,7 +105,7 @@ def register(bot: Bot) -> None:
         if not await _require(message):
             return
         _pending[(message.peer_id, message.from_id)] = "energy"
-        await message.answer(
+        await reply(message, 
             "VK ID игрока для полной энергии:",
             keyboard=cancel_keyboard().get_json(),
         )
@@ -115,7 +115,7 @@ def register(bot: Bot) -> None:
         if not await _require(message):
             return
         _pending[(message.peer_id, message.from_id)] = "cd"
-        await message.answer(
+        await reply(message, 
             "VK ID игрока для сброса кулдаунов:",
             keyboard=cancel_keyboard().get_json(),
         )
@@ -125,7 +125,7 @@ def register(bot: Bot) -> None:
         if not await _require(message):
             return
         _pending[(message.peer_id, message.from_id)] = "player"
-        await message.answer(
+        await reply(message, 
             "VK ID игрока:",
             keyboard=cancel_keyboard().get_json(),
         )
@@ -137,7 +137,7 @@ def register(bot: Bot) -> None:
         _pending[(message.peer_id, message.from_id)] = "del_nation"
         async with SessionLocal() as session:
             listing = await admin_svc.list_nations_short(session)
-        await message.answer(
+        await reply(message, 
             f"{listing}\n\n"
             "Напиши название или id страны для удаления.\n"
             "Примеры: Тест  |  1  |  id=1",
@@ -188,7 +188,7 @@ def register(bot: Bot) -> None:
             return
         if lower in {"отмена", "❌ отмена", "cancel"}:
             _pending.pop(key, None)
-            await message.answer("Отменено.", keyboard=admin_keyboard().get_json())
+            await reply(message, "Отменено.", keyboard=admin_keyboard().get_json())
             return
 
         _pending.pop(key, None)
@@ -205,7 +205,7 @@ def register(bot: Bot) -> None:
             elif mode == "del_nation":
                 await _do_del_nation(message, text)
         except (ValueError, IndexError):
-            await message.answer("Неверный формат.", keyboard=admin_keyboard().get_json())
+            await reply(message, "Неверный формат.", keyboard=admin_keyboard().get_json())
 
 
 async def _do_give(message: Message, vk_id: int, amount: int) -> None:
@@ -213,9 +213,9 @@ async def _do_give(message: Message, vk_id: int, amount: int) -> None:
         try:
             p = await admin_svc.give_crowns(session, vk_id, amount)
         except AdminError as e:
-            await message.answer(e.message, keyboard=admin_keyboard().get_json())
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
             return
-        await message.answer(
+        await reply(message, 
             f"✅ {p.name} ({vk_id}): {amount:+d} крон → {p.crowns}",
             keyboard=admin_keyboard().get_json(),
         )
@@ -226,9 +226,9 @@ async def _do_energy(message: Message, vk_id: int) -> None:
         try:
             p = await admin_svc.fill_energy(session, vk_id)
         except AdminError as e:
-            await message.answer(e.message, keyboard=admin_keyboard().get_json())
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
             return
-        await message.answer(
+        await reply(message, 
             f"⚡ {p.name}: энергия полная ({p.energy})",
             keyboard=admin_keyboard().get_json(),
         )
@@ -239,9 +239,9 @@ async def _do_cd(message: Message, vk_id: int) -> None:
         try:
             p = await admin_svc.reset_cooldowns(session, vk_id)
         except AdminError as e:
-            await message.answer(e.message, keyboard=admin_keyboard().get_json())
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
             return
-        await message.answer(
+        await reply(message, 
             f"⏱ Кулдауны сброшены: {p.name}",
             keyboard=admin_keyboard().get_json(),
         )
@@ -252,9 +252,9 @@ async def _do_player(message: Message, vk_id: int) -> None:
         try:
             text = await admin_svc.get_player_info(session, vk_id)
         except AdminError as e:
-            await message.answer(e.message, keyboard=admin_keyboard().get_json())
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
             return
-        await message.answer(text, keyboard=admin_keyboard().get_json())
+        await reply(message, text, keyboard=admin_keyboard().get_json())
 
 
 async def _do_del_nation(message: Message, name: str) -> None:
@@ -262,9 +262,9 @@ async def _do_del_nation(message: Message, name: str) -> None:
         try:
             deleted = await dissolve_nation_by_name(session, name)
         except NationError as e:
-            await message.answer(e.message, keyboard=admin_keyboard().get_json())
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
             return
-        await message.answer(
+        await reply(message, 
             f"🗑 Удалена страна {deleted}",
             keyboard=admin_keyboard().get_json(),
         )

@@ -17,7 +17,7 @@ from bot.keyboards import (
     rps_keyboard,
 )
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, reply_here, resolve_name
 from handlers.rules import match_cmd, payload_cmd
 from services.achievements import grant_title
 from services.auction import AuctionError, get_active_auctions, place_bid
@@ -73,7 +73,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             ev = await ensure_daily_event(session)
             await session.commit()
-        await message.answer(
+        await reply(message, 
             f"🎯 Доп. меню\n{format_event(ev)}\n\n"
             "Ивент · квест · аукцион · выборы · война бесед",
             keyboard=more_keyboard().get_json(),
@@ -86,7 +86,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             ev = await ensure_daily_event(session)
             await session.commit()
-        await message.answer(
+        await reply(message, 
             f"🌤 Ивент дня\n{format_event(ev)}",
             keyboard=more_keyboard().get_json(),
         )
@@ -99,7 +99,7 @@ def register(bot: Bot) -> None:
             try:
                 result = await do_smuggle(session, player)
             except SmuggleError as e:
-                await message.answer(e.message, keyboard=jobs_keyboard().get_json())
+                await reply(message, e.message, keyboard=jobs_keyboard().get_json())
                 return
 
             if result["success"]:
@@ -109,7 +109,7 @@ def register(bot: Bot) -> None:
                 drop_line = f"\n✨ Дроп: {drop['text']}" if drop else ""
                 notes = result.get("charge_notes") or []
                 notes_line = ("\n" + "\n".join(notes)) if notes else ""
-                await message.answer(
+                await reply(message, 
                     f"🕶 Контрабанда удалась! ×3\n"
                     f"+{result['gross']}{tax_line}\n"
                     f"На руки: +{result['net']}\n"
@@ -126,7 +126,7 @@ def register(bot: Bot) -> None:
                     if result.get("jailed")
                     else " · без тюрьмы"
                 )
-                await message.answer(
+                await reply(message, 
                     f"🚔 Поймали!\n"
                     f"Штраф −{result['fine']}{jail_line}\n"
                     f"💰 {result['crowns']}{drop_line}{notes_line}",
@@ -147,17 +147,17 @@ def register(bot: Bot) -> None:
                 try:
                     result = await claim_quest(session, player)
                 except ValueError as e:
-                    await message.answer(str(e), keyboard=more_keyboard().get_json())
+                    await reply(message, str(e), keyboard=more_keyboard().get_json())
                     return
                 title_line = f"\n🏅 {result['title']}" if result.get("title") else ""
-                await message.answer(
+                await reply(message, 
                     f"📦 Сундук квеста!\n+{result['reward']} крон\n"
                     f"💰 {result['crowns']}{title_line}",
                     keyboard=more_keyboard().get_json(),
                 )
                 return
 
-            await message.answer(
+            await reply(message, 
                 f"📦 Квест: сделай {needed} работы → сундук\n"
                 f"Прогресс: {in_cycle}/{needed} "
                 f"(всего работ {progress}, сундуков {claimed})",
@@ -166,7 +166,7 @@ def register(bot: Bot) -> None:
 
     @bot.on.message(func=match_cmd("emotions", "эмоции", "🎭 эмоции", "клан эмоции"))
     async def emotions_menu(message: Message):
-        await message.answer(
+        await reply(message, 
             "🎭 Эмоции страны — сообщение уйдёт в беседу государства.",
             keyboard=emotions_keyboard().get_json(),
         )
@@ -176,13 +176,13 @@ def register(bot: Bot) -> None:
         payload = message.get_payload_json() or {}
         kind = str(payload.get("kind") or "")
         if kind not in EMOTION_TEMPLATES:
-            await message.answer("Неизвестная эмоция.", keyboard=emotions_keyboard().get_json())
+            await reply(message, "Неизвестная эмоция.", keyboard=emotions_keyboard().get_json())
             return
         name = await resolve_name(message)
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             if not player.nation:
-                await message.answer("Нужна страна.", keyboard=main_keyboard().get_json())
+                await reply(message, "Нужна страна.", keyboard=main_keyboard().get_json())
                 return
             n = player.nation
             extra = n.motto or n.laws or "Слава Империи чатов!"
@@ -194,14 +194,14 @@ def register(bot: Bot) -> None:
                 extra=extra,
             )
             await notify_nation_chat(message.ctx_api, n.chat_peer_id, text)
-            await message.answer(
+            await reply(message, 
                 f"Отправлено в беседу {n.flag_emoji} {n.name}.",
                 keyboard=emotions_keyboard().get_json(),
             )
 
     @bot.on.message(func=match_cmd("duel_menu", "дуэль", "🎲 дуэль", "дуэли"))
     async def duel_menu(message: Message):
-        await message.answer(
+        await reply(message, 
             "🎲 Дуэль в беседе\n"
             f"Ставка {config.DUEL_MIN_BET}–{config.DUEL_MAX_BET} крон.\n"
             "КНБ или угадай число 1–5. Создай — соперник примет.",
@@ -217,7 +217,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             if player.crowns < bet:
-                await message.answer(
+                await reply(message, 
                     f"Не хватает крон (нужно {bet}).",
                     keyboard=duel_menu_keyboard().get_json(),
                 )
@@ -225,13 +225,15 @@ def register(bot: Bot) -> None:
             try:
                 duel = create_duel(message.peer_id, player.vk_id, player.name, bet, mode)
             except ValueError as e:
-                await message.answer(str(e), keyboard=duel_menu_keyboard().get_json())
+                await reply(message, str(e), keyboard=duel_menu_keyboard().get_json())
                 return
             player.crowns -= bet
             await session.commit()
 
         mode_label = "камень-ножницы-бумага" if mode == "rps" else "угадай число"
-        await message.answer(
+        # inline в том же peer — соперник видит кнопку в беседе
+        await reply_here(
+            message,
             f"🎲 {name} вызывает на дуэль!\n"
             f"Режим: {mode_label} · ставка {bet}\n"
             f"Кто готов — жми «Принять» (код {duel.token}).",
@@ -244,7 +246,7 @@ def register(bot: Bot) -> None:
         token = str(payload.get("token") or "")
         duel = get_duel(token)
         if not duel:
-            await message.answer("Дуэль истекла или не найдена.", keyboard=main_keyboard().get_json())
+            await reply(message, "Дуэль истекла или не найдена.", keyboard=main_keyboard().get_json())
             return
         if message.from_id == duel.challenger_id:
             await message.answer("Нельзя принять свою дуэль.")
@@ -269,7 +271,8 @@ def register(bot: Bot) -> None:
             if duel.mode == "rps"
             else "Угадайте число 1–5 (оба игрока):"
         )
-        await message.answer(
+        await reply_here(
+            message,
             f"✅ {name} принял дуэль vs {duel.challenger_name}!\n{prompt}",
             keyboard=kb.get_json(),
         )
@@ -281,7 +284,7 @@ def register(bot: Bot) -> None:
         move = str(payload.get("move") or "")
         duel = get_duel(token)
         if not duel or not duel.opponent_id:
-            await message.answer("Дуэль недоступна.", keyboard=main_keyboard().get_json())
+            await reply(message, "Дуэль недоступна.", keyboard=main_keyboard().get_json())
             return
         if message.from_id not in (duel.challenger_id, duel.opponent_id):
             await message.answer("Ты не участник этой дуэли.")
@@ -316,7 +319,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             auctions = await get_active_auctions(session)
             if not auctions:
-                await message.answer(
+                await reply(message, 
                     "🏷 Активных аукционов нет.\nТрофеи выпадают после рейдов.",
                     keyboard=more_keyboard().get_json(),
                 )
@@ -325,7 +328,7 @@ def register(bot: Bot) -> None:
             for a in auctions:
                 lines.append(f"#{a.id} {a.item_name} — ставка {a.bid}")
             lines.append("\nКнопка или: ставка ID сумма")
-            await message.answer(
+            await reply(message, 
                 "\n".join(lines),
                 keyboard=auction_keyboard(auctions).get_json(),
             )
@@ -349,7 +352,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             if not player.nation:
-                await message.answer("Нужна страна.", keyboard=more_keyboard().get_json())
+                await reply(message, "Нужна страна.", keyboard=more_keyboard().get_json())
                 return
             status = await election_status(session, player.nation)
             from sqlalchemy import select
@@ -359,7 +362,7 @@ def register(bot: Bot) -> None:
                 select(P).where(P.nation_id == player.nation_id).order_by(P.crowns.desc())
             )
             citizens = list(result.scalars().all())
-            await message.answer(
+            await reply(message, 
                 f"🗳 Выборы лидера (раз в неделю)\n{status}\n\n"
                 "Голос — кнопкой по кандидату. Завершить — когда ≥2 голосов.",
                 keyboard=election_citizens_keyboard(citizens).get_json(),
@@ -375,10 +378,10 @@ def register(bot: Bot) -> None:
             try:
                 await cast_vote(session, player, cand)
             except ElectionError as e:
-                await message.answer(e.message, keyboard=more_keyboard().get_json())
+                await reply(message, e.message, keyboard=more_keyboard().get_json())
                 return
             status = await election_status(session, player.nation)
-            await message.answer(f"✅ Голос учтён.\n{status}", keyboard=more_keyboard().get_json())
+            await reply(message, f"✅ Голос учтён.\n{status}", keyboard=more_keyboard().get_json())
 
     @bot.on.message(func=payload_cmd("election_finish"))
     async def election_finish(message: Message):
@@ -391,7 +394,7 @@ def register(bot: Bot) -> None:
             try:
                 result = await finish_election(session, player.nation)
             except ElectionError as e:
-                await message.answer(e.message, keyboard=more_keyboard().get_json())
+                await reply(message, e.message, keyboard=more_keyboard().get_json())
                 return
             w = result["winner"]
             title_line = f"\n🏅 {result['title']}" if result.get("title") else ""
@@ -400,7 +403,7 @@ def register(bot: Bot) -> None:
                 f"Новый лидер: {w.name} ({result['votes']}/{result['total']}){title_line}"
             )
             await notify_nation_chat(message.ctx_api, player.nation.chat_peer_id, text)
-            await message.answer(text, keyboard=more_keyboard().get_json())
+            await reply(message, text, keyboard=more_keyboard().get_json())
 
     @bot.on.message(func=match_cmd("chatwar", "война бесед", "⚔ война бесед", "чатвар"))
     async def chatwar_menu(message: Message):
@@ -412,14 +415,14 @@ def register(bot: Bot) -> None:
                 not player.nation
                 or player.nation.leader_id != player.vk_id
             ):
-                await message.answer(
+                await reply(message, 
                     f"{status}\n\nОбъявить может только лидер "
                     f"(ставка казны {config.CHAT_WAR_STAKE}).",
                     keyboard=more_keyboard().get_json(),
                 )
                 return
             targets = await raid_candidates(session, player.nation.id)
-            await message.answer(
+            await reply(message, 
                 f"{status}\n\n⚔ Объяви войну бесед (банк {config.CHAT_WAR_STAKE * 2}).\n"
                 "Очки — за успешные рейды. Или: война бесед Название",
                 keyboard=chatwar_targets_keyboard([t.name for t in targets]).get_json(),
@@ -446,9 +449,9 @@ async def _do_bid(message: Message, auction_id: int, amount: int) -> None:
         try:
             auction = await place_bid(session, auction_id, player, amount)
         except AuctionError as e:
-            await message.answer(e.message, keyboard=more_keyboard().get_json())
+            await reply(message, e.message, keyboard=more_keyboard().get_json())
             return
-        await message.answer(
+        await reply(message, 
             f"🏷 Ставка принята: #{auction.id} {auction.item_name} → {auction.bid}",
             keyboard=more_keyboard().get_json(),
         )
@@ -464,7 +467,7 @@ async def _start_chatwar(message: Message, target: str) -> None:
         try:
             war = await start_war(session, player.nation, target)
         except ChatWarError as e:
-            await message.answer(e.message, keyboard=more_keyboard().get_json())
+            await reply(message, e.message, keyboard=more_keyboard().get_json())
             return
         from services.nation import get_nation_by_id
 
@@ -479,7 +482,7 @@ async def _start_chatwar(message: Message, target: str) -> None:
         await notify_nation_chat(message.ctx_api, a.chat_peer_id, announce)
         if b:
             await notify_nation_chat(message.ctx_api, b.chat_peer_id, announce)
-        await message.answer(announce, keyboard=more_keyboard().get_json())
+        await reply(message, announce, keyboard=more_keyboard().get_json())
 
 
 async def _resolve_duel(message: Message, duel) -> None:
@@ -525,4 +528,4 @@ async def _resolve_duel(message: Message, duel) -> None:
         await session.commit()
 
     cleanup_duel(duel.token)
-    await message.answer(text, keyboard=main_keyboard().get_json())
+    await reply_here(message, text)

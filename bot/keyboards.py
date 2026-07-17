@@ -73,24 +73,24 @@ def duel_menu_keyboard() -> Keyboard:
 
 
 def duel_accept_keyboard(token: str) -> Keyboard:
-    kb = Keyboard(one_time=True, inline=False)
+    # inline — в беседе не подменяет общую reply-клавиатуру
+    kb = Keyboard(one_time=True, inline=True)
     kb.add(
         Text("✅ Принять дуэль", {"cmd": "duel_accept", "token": token}),
         color=KeyboardButtonColor.POSITIVE,
     )
-    kb.add(Text("❌ Отмена", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 
 def rps_keyboard(token: str) -> Keyboard:
-    kb = Keyboard(one_time=True, inline=False)
+    kb = Keyboard(one_time=True, inline=True)
     for label, move in [("✊ Камень", "rock"), ("✋ Бумага", "paper"), ("✌ Ножницы", "scissors")]:
         kb.add(Text(label, {"cmd": "duel_move", "token": token, "move": move}))
     return kb
 
 
 def number_keyboard(token: str) -> Keyboard:
-    kb = Keyboard(one_time=True, inline=False)
+    kb = Keyboard(one_time=True, inline=True)
     for n in range(1, 6):
         kb.add(Text(str(n), {"cmd": "duel_move", "token": token, "move": str(n)}))
         if n == 3:

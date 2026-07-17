@@ -11,7 +11,7 @@ from bot.keyboards import (
 )
 from content import items_catalog as cat
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
 from services.charges import MANUAL_CHARGES, ChargeError, activate_manual_charge
 from services.chronicle_store import add_event
@@ -49,7 +49,7 @@ def register(bot: Bot) -> None:
             lines = ["🛡 Экипировка:", format_loadout_short(loadout)]
             if loadout.charges_ready:
                 lines.append("Заряды готовы: " + ", ".join(loadout.charges_ready.keys()))
-            await message.answer(
+            await reply(message, 
                 "\n".join(lines),
                 keyboard=unequip_keyboard().get_json(),
             )
@@ -61,7 +61,7 @@ def register(bot: Bot) -> None:
             player = await get_or_create_player(session, message.from_id, name)
             n = await discovered_count(session, player.vk_id)
             total = cat.catalog_size()
-            await message.answer(
+            await reply(message, 
                 f"📖 Кодекс Арсенала: {n}/{total}\n"
                 "Новые предметы открываются при дропе.",
                 keyboard=bag_keyboard().get_json(),
@@ -75,7 +75,7 @@ def register(bot: Bot) -> None:
         if not it:
             await message.answer("Предмет не найден.")
             return
-        await message.answer(
+        await reply(message, 
             f"{cat.format_item(it)}\n{cat.format_buffs(it)}",
             keyboard=item_actions_keyboard(item_id, it["rarity"]).get_json(),
         )
@@ -90,7 +90,7 @@ def register(bot: Bot) -> None:
             try:
                 result = await equip(session, player, item_id)
             except InventoryError as e:
-                await message.answer(e.message, keyboard=bag_keyboard().get_json())
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
             text = f"Надето: {cat.format_item(result['item'])}"
             if result.get("mythic_announce"):
@@ -101,7 +101,7 @@ def register(bot: Bot) -> None:
                 await add_event(session, "mythic", announce, str(player.nation_id or ""))
                 await post_wall(message.ctx_api, announce)
                 text += "\n" + announce
-            await message.answer(text, keyboard=bag_keyboard().get_json())
+            await reply(message, text, keyboard=bag_keyboard().get_json())
 
     @bot.on.message(func=payload_cmd("bag_unequip"))
     async def bag_unequip(message: Message):
@@ -113,11 +113,11 @@ def register(bot: Bot) -> None:
             try:
                 result = await unequip(session, player, slot)
             except InventoryError as e:
-                await message.answer(e.message, keyboard=bag_keyboard().get_json())
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
             it = result["item"]
             label = cat.format_item(it) if it else slot
-            await message.answer(f"Снято: {label}", keyboard=bag_keyboard().get_json())
+            await reply(message, f"Снято: {label}", keyboard=bag_keyboard().get_json())
 
     @bot.on.message(func=payload_cmd("bag_sell"))
     async def bag_sell(message: Message):
@@ -125,10 +125,10 @@ def register(bot: Bot) -> None:
         item_id = str(payload.get("id") or "")
         it = cat.get_item(item_id)
         if not it:
-            await message.answer("Предмет не найден.", keyboard=bag_keyboard().get_json())
+            await reply(message, "Предмет не найден.", keyboard=bag_keyboard().get_json())
             return
         price = cat.SELL_PRICE.get(it["rarity"], 10)
-        await message.answer(
+        await reply(message, 
             f"💰 Продажа боту\n"
             f"{cat.format_item(it)}\n"
             f"Цена: {price} крон\n\n"
@@ -146,9 +146,9 @@ def register(bot: Bot) -> None:
             try:
                 result = await sell_item(session, player, item_id, 1)
             except InventoryError as e:
-                await message.answer(e.message, keyboard=bag_keyboard().get_json())
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
-            await message.answer(
+            await reply(message, 
                 f"Продано: {cat.format_item(result['item'])} → +{result['price']}\n"
                 f"💰 {result['crowns']}",
                 keyboard=bag_keyboard().get_json(),
@@ -164,9 +164,9 @@ def register(bot: Bot) -> None:
             try:
                 result = await donate_item(session, player, item_id)
             except InventoryError as e:
-                await message.answer(e.message, keyboard=bag_keyboard().get_json())
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
-            await message.answer(
+            await reply(message, 
                 f"🏛 В казну: {cat.format_item(result['item'])} → +{result['amount']}\n"
                 f"Казна: {result['treasury']}",
                 keyboard=bag_keyboard().get_json(),
@@ -182,9 +182,9 @@ def register(bot: Bot) -> None:
             try:
                 result = await merge_commons(session, player, item_id)
             except InventoryError as e:
-                await message.answer(e.message, keyboard=bag_keyboard().get_json())
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
-            await message.answer(
+            await reply(message, 
                 f"🔀 Слито {result['spent']}× {result['from']['name']}\n"
                 f"→ {cat.format_item(result['to'])}",
                 keyboard=bag_keyboard().get_json(),
@@ -198,7 +198,7 @@ def register(bot: Bot) -> None:
             loadout = await get_loadout(session, player)
             ready = [c for c in loadout.charges_ready if c in MANUAL_CHARGES]
             if not ready:
-                await message.answer(
+                await reply(message, 
                     "Нет ручных зарядов (нужен экипированный миф/легенда с ручной активацией).",
                     keyboard=bag_keyboard().get_json(),
                 )
@@ -206,7 +206,7 @@ def register(bot: Bot) -> None:
             lines = ["⚡ Готовые ручные заряды:"]
             for c in ready:
                 lines.append(f"• {MANUAL_CHARGES[c]}")
-            await message.answer(
+            await reply(message, 
                 "\n".join(lines),
                 keyboard=charge_activate_keyboard(ready).get_json(),
             )
@@ -225,9 +225,9 @@ def register(bot: Bot) -> None:
                     session, player, code, tax_rate=tax_rate
                 )
             except ChargeError as e:
-                await message.answer(e.message, keyboard=bag_keyboard().get_json())
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
-            await message.answer(text, keyboard=bag_keyboard().get_json())
+            await reply(message, text, keyboard=bag_keyboard().get_json())
 
 
 async def _show_bag(message: Message, page: int) -> None:
@@ -255,13 +255,13 @@ async def _show_bag(message: Message, page: int) -> None:
         ]
         if not chunk:
             lines.append("Пусто. Работай — предметы падают с шансом.")
-            await message.answer("\n".join(lines), keyboard=bag_keyboard(page).get_json())
+            await reply(message, "\n".join(lines), keyboard=bag_keyboard(page).get_json())
             return
 
         for it, qty in chunk:
             lines.append(f"• {cat.format_item(it)} ×{qty}")
         lines.append("\nНажми предмет ниже для действий.")
-        await message.answer(
+        await reply(message, 
             "\n".join(lines),
             keyboard=bag_items_keyboard(chunk, page, has_next).get_json(),
         )

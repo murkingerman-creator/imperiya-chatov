@@ -13,7 +13,7 @@ from bot.keyboards import (
 from content import items_catalog as cat
 from db.database import SessionLocal
 from db.models import Player
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
 from services.marketplace import (
     MarketError,
@@ -55,7 +55,7 @@ def register(bot: Bot) -> None:
         )
     )
     async def market_home(message: Message):
-        await message.answer(
+        await reply(message, 
             "🛒 Торговая площадка\n"
             "Покупай и продавай любые предметы игрокам.\n"
             f"Комиссия продавца {int(config.MARKET_FEE * 100)}% · "
@@ -72,7 +72,7 @@ def register(bot: Bot) -> None:
 
     @bot.on.message(func=match_cmd("mkt_help", "🔎 поиск"))
     async def market_help(message: Message):
-        await message.answer(
+        await reply(message, 
             "🔎 Поиск на торге\n"
             "• найти <название> — лоты по имени\n"
             "• найти жила — частичное совпадение\n"
@@ -104,7 +104,7 @@ def register(bot: Bot) -> None:
             )
             listing = res.scalar_one_or_none()
             if not listing or not listing.active:
-                await message.answer(
+                await reply(message, 
                     "Лот не найден.",
                     keyboard=market_menu_keyboard().get_json(),
                 )
@@ -114,7 +114,7 @@ def register(bot: Bot) -> None:
             )
             s = seller.scalar_one_or_none()
             text = format_listing_card(listing, s.name if s else None)
-            await message.answer(
+            await reply(message, 
                 text,
                 keyboard=market_listing_actions_keyboard(
                     listing.id, is_owner=listing.seller_vk_id == player.vk_id
@@ -131,11 +131,11 @@ def register(bot: Bot) -> None:
             try:
                 result = await buy_listing(session, player, listing_id)
             except MarketError as e:
-                await message.answer(e.message, keyboard=market_menu_keyboard().get_json())
+                await reply(message, e.message, keyboard=market_menu_keyboard().get_json())
                 return
             it = result["item"]
             first = " (новый в кодексе!)" if result.get("first") else ""
-            await message.answer(
+            await reply(message, 
                 f"✅ Куплено за {result['price']}💰\n"
                 f"{cat.format_item(it)}{first}\n"
                 f"{cat.format_buffs(it)}\n"
@@ -153,10 +153,10 @@ def register(bot: Bot) -> None:
             try:
                 result = await cancel_listing(session, player, listing_id)
             except MarketError as e:
-                await message.answer(e.message, keyboard=market_menu_keyboard().get_json())
+                await reply(message, e.message, keyboard=market_menu_keyboard().get_json())
                 return
             it = result["item"]
-            await message.answer(
+            await reply(message, 
                 f"Лот снят. {cat.format_item(it) if it else ''} вернулся в сумку.",
                 keyboard=market_menu_keyboard().get_json(),
             )
@@ -172,7 +172,7 @@ def register(bot: Bot) -> None:
                 session, seller_vk_id=player.vk_id, page=page
             )
             if not listings and page == 0:
-                await message.answer(
+                await reply(message, 
                     "У тебя нет активных лотов.\nИз Сумки → На торг.",
                     keyboard=market_menu_keyboard().get_json(),
                 )
@@ -184,7 +184,7 @@ def register(bot: Bot) -> None:
                     f"#{listing.id} {cat.format_item(it) if it else listing.item_id} "
                     f"— {listing.price}💰"
                 )
-            await message.answer(
+            await reply(message, 
                 "\n".join(lines),
                 keyboard=market_listings_keyboard(
                     listings, page=page, has_next=has_next, mine=True
@@ -203,7 +203,7 @@ def register(bot: Bot) -> None:
         if not it:
             await message.answer("Предмет не найден.")
             return
-        await message.answer(
+        await reply(message, 
             f"🛒 Выставить на торг\n{cat.format_item(it)}\n"
             f"{cat.format_buffs(it)}\n\n"
             f"Выбери цену или: торг {item_id} <цена>\n"
@@ -260,7 +260,7 @@ async def _browse(
         if query:
             title += f" · «{query}»"
         if not listings:
-            await message.answer(
+            await reply(message, 
                 f"{title}\nЛотов нет. Выстави из Сумки → На торг.",
                 keyboard=market_menu_keyboard().get_json(),
             )
@@ -275,7 +275,7 @@ async def _browse(
             )
             if short:
                 lines.append(f"   {short}")
-        await message.answer(
+        await reply(message, 
             "\n".join(lines),
             keyboard=market_listings_keyboard(
                 listings,
@@ -294,10 +294,10 @@ async def _do_list(message: Message, item_id: str, price: int) -> None:
         try:
             listing = await create_listing(session, player, item_id, price)
         except MarketError as e:
-            await message.answer(e.message, keyboard=market_menu_keyboard().get_json())
+            await reply(message, e.message, keyboard=market_menu_keyboard().get_json())
             return
         it = cat.get_item(item_id)
-        await message.answer(
+        await reply(message, 
             f"✅ Лот #{listing.id} выставлен за {price}💰\n"
             f"{cat.format_item(it) if it else item_id}\n"
             f"{cat.format_buffs(it) if it else ''}",

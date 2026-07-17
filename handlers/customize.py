@@ -3,7 +3,7 @@ from vkbottle.bot import Bot, Message
 from bot import config
 from bot.keyboards import customize_keyboard, main_keyboard, preset_keyboard, tax_keyboard, cancel_keyboard
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_name
 from handlers.nation import get_pending_text
 from handlers.rules import match_cmd, payload_cmd
 from services.customize import CustomizeError, set_field
@@ -17,12 +17,12 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             if not player.nation or player.nation.leader_id != player.vk_id:
-                await message.answer(
+                await reply(message, 
                     "Оформление доступно только лидеру страны.",
                     keyboard=main_keyboard().get_json(),
                 )
                 return
-            await message.answer(
+            await reply(message, 
                 "🎨 Оформление державы\n"
                 f"Частая смена (<{config.CUSTOMIZE_COOLDOWN_HOURS}ч) стоит "
                 f"{config.CUSTOMIZE_CHANGE_COST} крон.",
@@ -31,35 +31,35 @@ def register(bot: Bot) -> None:
 
     @bot.on.message(func=payload_cmd("c_flag"))
     async def pick_flag(message: Message):
-        await message.answer(
+        await reply(message, 
             "Выбери флаг:",
             keyboard=preset_keyboard("c_set", list(config.FLAGS), field="flag_emoji").get_json(),
         )
 
     @bot.on.message(func=payload_cmd("c_emblem"))
     async def pick_emblem(message: Message):
-        await message.answer(
+        await reply(message, 
             "Выбери герб:",
             keyboard=preset_keyboard("c_set", list(config.EMBLEMS), field="emblem_emoji").get_json(),
         )
 
     @bot.on.message(func=payload_cmd("c_gov"))
     async def pick_gov(message: Message):
-        await message.answer(
+        await reply(message, 
             "Форма правления:",
             keyboard=preset_keyboard("c_set", list(config.GOVERNMENTS), field="government").get_json(),
         )
 
     @bot.on.message(func=payload_cmd("c_color"))
     async def pick_color(message: Message):
-        await message.answer(
+        await reply(message, 
             "Цвет державы:",
             keyboard=preset_keyboard("c_set", list(config.COLORS), field="color_tag").get_json(),
         )
 
     @bot.on.message(func=payload_cmd("c_tax"))
     async def pick_tax(message: Message):
-        await message.answer("Налог с работы граждан:", keyboard=tax_keyboard().get_json())
+        await reply(message, "Налог с работы граждан:", keyboard=tax_keyboard().get_json())
 
     @bot.on.message(func=payload_cmd("c_text"))
     async def ask_text(message: Message):
@@ -74,9 +74,9 @@ def register(bot: Bot) -> None:
         }
         if field not in labels:
             return
-        get_pending_text()[(message.peer_id, message.from_id)] = field
-        await message.answer(
-            f"Введи {labels[field]} текстом:",
+        get_pending_text()[message.from_id] = field
+        await reply(message, 
+            f"Введи {labels[field]} текстом (в ЛС):",
             keyboard=cancel_keyboard().get_json(),
         )
 
@@ -91,10 +91,10 @@ def register(bot: Bot) -> None:
             try:
                 result = await set_field(session, player, field, value)
             except CustomizeError as e:
-                await message.answer(e.message, keyboard=customize_keyboard().get_json())
+                await reply(message, e.message, keyboard=customize_keyboard().get_json())
                 return
             cost_line = f" (−{result['cost']} крон)" if result["cost"] else ""
-            await message.answer(
+            await reply(message, 
                 f"Готово: {field} = {value}{cost_line}",
                 keyboard=customize_keyboard().get_json(),
             )

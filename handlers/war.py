@@ -4,9 +4,10 @@ from vkbottle.bot import Bot, Message
 
 from bot.keyboards import main_keyboard, raid_targets_keyboard
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
 from services.chronicle_store import add_event
+from services.nation import count_citizens
 from services.notify import notify_nation_chat
 from services.player import get_or_create_player
 from services.war import WarError, raid, raid_candidates
@@ -18,6 +19,14 @@ def _is_raid_text(message: Message) -> bool:
     return bool(RAID_RE.match((message.text or "").strip()))
 
 
+def _battle_line(result: dict) -> str:
+    return (
+        f"⚔ Сила: {result['atk_power']} (👥{result['atk_citizens']}) "
+        f"vs {result['def_power']} (👥{result['def_citizens']})\n"
+        f"Шанс успеха был {int(result['chance'] * 100)}%"
+    )
+
+
 def register(bot: Bot) -> None:
     @bot.on.message(func=match_cmd("war", "война", "⚔ война", "рейд", "⚔ рейд"))
     async def war_menu(message: Message):
@@ -26,14 +35,16 @@ def register(bot: Bot) -> None:
             player = await get_or_create_player(session, message.from_id, name)
 
             if not player.nation:
-                await message.answer(
+                await reply(
+                    message,
                     "Сначала вступи в страну или оснуй её.",
                     keyboard=main_keyboard().get_json(),
                 )
                 return
 
             if player.nation.leader_id != player.vk_id:
-                await message.answer(
+                await reply(
+                    message,
                     f"Рейды объявляет только лидер.\n"
                     f"Твоя страна: {player.nation.flag_emoji} {player.nation.name}\n"
                     f"Казна: {player.nation.treasury}",
@@ -43,21 +54,28 @@ def register(bot: Bot) -> None:
 
             targets = await raid_candidates(session, player.nation.id)
             if not targets:
-                await message.answer(
+                await reply(
+                    message,
                     "Нет богатых целей. Пусть у стран наполнится казна.",
                     keyboard=main_keyboard().get_json(),
                 )
                 return
 
+            my_n = await count_citizens(session, player.nation.id)
             lines = [
-                f"⚔ Рейд от {player.nation.flag_emoji} {player.nation.name}",
+                f"⚔ Рейд от {player.nation.flag_emoji} {player.nation.name} · 👥 {my_n}",
+                "Сила = граждане + экип. Больше людей — выше шанс и добыча.",
                 "Цель кнопкой или: рейд Название",
                 "",
             ]
             for t in targets:
-                lines.append(f"• {t.flag_emoji} {t.name} — казна {t.treasury}")
+                n = await count_citizens(session, t.id)
+                lines.append(
+                    f"• {t.flag_emoji} {t.name} — казна {t.treasury} · 👥 {n}"
+                )
 
-            await message.answer(
+            await reply(
+                message,
                 "\n".join(lines),
                 keyboard=raid_targets_keyboard([t.name for t in targets]).get_json(),
             )
@@ -83,11 +101,36 @@ async def _do_raid(message: Message, target: str) -> None:
         try:
             result = await raid(session, player, target)
         except WarError as e:
-            await message.answer(e.message, keyboard=main_keyboard().get_json())
+            await reply(message, e.message, keyboard=main_keyboard().get_json())
             return
 
         atk = result["attacker"]
         dfn = result["defender"]
+        battle = _battle_line(result)
+
+        if not result.get("success", True):
+            text = (
+                f"🛡 Рейд отбит!\n"
+                f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
+                f"{battle}\n"
+                f"Оборона устояла. КД рейда сгорел."
+            )
+            notes = result.get("charge_notes") or []
+            if notes:
+                text += "\n" + "\n".join(notes)
+            await notify_nation_chat(
+                message.ctx_api,
+                atk.chat_peer_id,
+                f"🛡 Рейд на {dfn.flag_emoji} {dfn.name} отбит. {battle}",
+            )
+            await notify_nation_chat(
+                message.ctx_api,
+                dfn.chat_peer_id,
+                f"🛡 Отразили рейд {atk.flag_emoji} {atk.name}!\n{battle}",
+            )
+            await reply(message, text, keyboard=main_keyboard().get_json())
+            return
+
         extra = ""
         if result.get("titles"):
             extra += f"\n🏅 {', '.join(result['titles'])}"
@@ -106,8 +149,9 @@ async def _do_raid(message: Message, target: str) -> None:
         if result.get("reflected"):
             extra += f"\n🛡 Отражено защитой: {result['reflected']}"
         text = (
-            f"⚔ Рейд!\n"
+            f"⚔ Рейд удался!\n"
             f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
+            f"{battle}\n"
             f"Захвачено: {result['stolen']}\n"
             f"В казну: +{result['treasury_cut']} · Лидеру: +{result['leader_cut']}"
             f"{extra}"
@@ -121,11 +165,11 @@ async def _do_raid(message: Message, target: str) -> None:
         await notify_nation_chat(
             message.ctx_api,
             atk.chat_peer_id,
-            f"⚔ Победа! Рейд на {dfn.flag_emoji} {dfn.name}: +{result['stolen']} к казне/лидеру",
+            f"⚔ Победа! Рейд на {dfn.flag_emoji} {dfn.name}: +{result['stolen']}\n{battle}",
         )
         await notify_nation_chat(
             message.ctx_api,
             dfn.chat_peer_id,
-            f"💥 Нас ограбили! {atk.flag_emoji} {atk.name} унесли {result['stolen']} из казны",
+            f"💥 Нас ограбили! {atk.flag_emoji} {atk.name} унесли {result['stolen']}\n{battle}",
         )
-        await message.answer(text, keyboard=main_keyboard().get_json())
+        await reply(message, text, keyboard=main_keyboard().get_json())

@@ -132,6 +132,15 @@ RAID_MIN_STEAL = 10
 RAID_LEADER_SHARE = 0.30
 RAID_TREASURY_SHARE = 0.70
 RAID_NIGHT_COOLDOWN_MINUTES = 15  # during raid night
+# Combat: сила = база + вес*граждане + √-бонус + экип
+RAID_COMBAT_BASE = 3.0
+RAID_CITIZEN_WEIGHT = 1.15       # линейно за человека
+RAID_CITIZEN_SQRT_WEIGHT = 1.2   # доп. с убывающей отдачей
+RAID_GEAR_ATK_WEIGHT = 10.0   # * raid_mult лидера
+RAID_GEAR_DEF_WEIGHT = 14.0   # * raid_defend лидера/ауры
+RAID_WIN_CHANCE_MIN = 0.15
+RAID_WIN_CHANCE_MAX = 0.90
+RAID_STEAL_NOISE = 0.08  # ± шум к доле после учёта перевеса
 
 # Smuggle
 SMUGGLE_COOLDOWN_MIN = 35

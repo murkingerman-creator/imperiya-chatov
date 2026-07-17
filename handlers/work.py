@@ -3,7 +3,7 @@ from vkbottle.bot import Bot, Message
 from bot import config
 from bot.keyboards import jobs_keyboard, main_keyboard, minigame_keyboard
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
 from services.economy import WorkError, finish_minigame, start_minigame
 from services.item_effects import get_loadout
@@ -13,7 +13,7 @@ from services.player import get_or_create_player
 def register(bot: Bot) -> None:
     @bot.on.message(func=match_cmd("jobs", "работа", "💼 работа", "работы"))
     async def jobs_menu(message: Message):
-        await message.answer(
+        await reply(message, 
             "💼 Работы (у каждой свой КД и мини-игра):\n"
             "🍺 Таверна ~10м · 🎣 Рыбалка ~12м · 🌾 Поле ~16м\n"
             "🛒 Рынок ~18м · 🔥 Кузня ~28м · ⛏ Шахта ~35м\n"
@@ -41,13 +41,13 @@ def register(bot: Bot) -> None:
                     player, job, skip_cd=skip_cd, charge_flags=flags
                 )
             except WorkError as e:
-                await message.answer(e.message, keyboard=jobs_keyboard().get_json())
+                await reply(message, e.message, keyboard=jobs_keyboard().get_json())
                 return
 
             prompt = game["prompt"]
             if flags.get("free_mine"):
                 prompt += "\n⚡ Заряд: шахта без КД ×2"
-            await message.answer(
+            await reply(message, 
                 prompt,
                 keyboard=minigame_keyboard(game["token"], game["buttons"]).get_json(),
             )
@@ -63,7 +63,7 @@ def register(bot: Bot) -> None:
             try:
                 result = await finish_minigame(session, player, token, answer)
             except WorkError as e:
-                await message.answer(e.message, keyboard=jobs_keyboard().get_json())
+                await reply(message, e.message, keyboard=jobs_keyboard().get_json())
                 return
 
             status = "Успех!" if result["success"] else "Провал…"
@@ -90,7 +90,7 @@ def register(bot: Bot) -> None:
             notes = result.get("charge_notes") or []
             notes_line = ("\n" + "\n".join(notes)) if notes else ""
 
-            await message.answer(
+            await reply(message, 
                 f"{result['title']}: {status}\n"
                 f"Заработано: +{result['gross']}{tax_line}{bonus_line}\n"
                 f"На руки: +{result['net']}\n"

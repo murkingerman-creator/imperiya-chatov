@@ -2,7 +2,7 @@ from vkbottle.bot import Bot, Message
 
 from bot.keyboards import main_keyboard
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd
 from services.nation import NationError, apply_invite
 from services.chronicle_store import add_event
@@ -28,7 +28,7 @@ def register(bot: Bot) -> None:
                 if player.nation
                 else "Без страны — только личные бонусы"
             )
-            await message.answer(
+            await reply(message, 
                 f"📨 Код: {player.invite_code}\n"
                 f"Друг пишет: инвайт {player.invite_code}\n\n"
                 f"+{config.INVITE_INVITER_REWARD} тебе / "
@@ -43,7 +43,7 @@ def register(bot: Bot) -> None:
         text = (message.text or "").strip()
         parts = text.split(maxsplit=1)
         if len(parts) < 2:
-            await message.answer("Формат: инвайт КОД", keyboard=main_keyboard().get_json())
+            await reply(message, "Формат: инвайт КОД", keyboard=main_keyboard().get_json())
             return
         code = parts[1].strip()
         name = await resolve_name(message)
@@ -52,7 +52,7 @@ def register(bot: Bot) -> None:
             try:
                 result = await apply_invite(session, player, code)
             except NationError as e:
-                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                await reply(message, e.message, keyboard=main_keyboard().get_json())
                 return
 
             nation = result["nation"]
@@ -74,7 +74,7 @@ def register(bot: Bot) -> None:
                     f"📨 {player.name} вступил по инвайту!",
                 )
 
-            await message.answer(
+            await reply(message, 
                 f"✅ Инвайт!\n+{result['invitee_reward']} тебе\n"
                 f"+{result['inviter_reward']} пригласившему{extra}",
                 keyboard=main_keyboard().get_json(),

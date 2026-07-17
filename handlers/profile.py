@@ -3,7 +3,7 @@ from vkbottle.bot import Bot, Message
 from bot import config
 from bot.keyboards import main_keyboard
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd
 from services.achievements import format_titles
 from services.inventory import discovered_count, get_equipped
@@ -68,4 +68,4 @@ def register(bot: Bot) -> None:
                 f"{jail_line}\n"
                 f"{format_event(ev)}"
             )
-            await message.answer(text, keyboard=main_keyboard().get_json())
+            await reply(message, text, keyboard=main_keyboard().get_json())

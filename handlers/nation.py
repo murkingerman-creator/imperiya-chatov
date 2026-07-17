@@ -12,7 +12,7 @@ from bot.keyboards import (
     cancel_keyboard,
 )
 from db.database import SessionLocal
-from handlers.common import resolve_name
+from handlers.common import reply, resolve_chat_peer, resolve_name, remember_chat_peer
 from handlers.rules import match_cmd, payload_cmd
 from services.chronicle_store import add_event
 from services.customize import CustomizeError, set_field
@@ -23,7 +23,6 @@ from services.nation import (
     format_nation_card,
     found_nation,
     get_nation_by_chat,
-    is_chat_peer,
     join_nation,
     leave_nation,
     list_citizens,
@@ -32,8 +31,10 @@ from services.nation import (
 from services.notify import notify_nation_chat
 from services.player import get_or_create_player
 
-_pending_found: set[tuple[int, int]] = set()
-_pending_text: dict[tuple[int, int], str] = {}
+# vk_id -> chat_peer_id (ожидание названия страны)
+_pending_found: dict[int, int] = {}
+# vk_id -> field name (ожидание текста оформления)
+_pending_text: dict[int, str] = {}
 
 RESERVED = {
     "старт", "начать", "меню", "📋 меню", "профиль", "👤 профиль",
@@ -52,8 +53,10 @@ def register(bot: Bot) -> None:
         )
     )
     async def nation_menu(message: Message):
+        remember_chat_peer(message)
         name = await resolve_name(message)
-        in_chat = is_chat_peer(message.peer_id)
+        chat_peer = resolve_chat_peer(message)
+        in_chat = chat_peer is not None
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             has_nation = bool(player.nation_id)
@@ -66,7 +69,7 @@ def register(bot: Bot) -> None:
                     text += "\n👑 Ты лидер"
             else:
                 chat_nation = (
-                    await get_nation_by_chat(session, message.peer_id) if in_chat else None
+                    await get_nation_by_chat(session, chat_peer) if chat_peer else None
                 )
                 if chat_nation:
                     text = (
@@ -84,7 +87,7 @@ def register(bot: Bot) -> None:
                         "Добавь сообщество в чат → Страна → Основать."
                     )
 
-            await message.answer(
+            await reply(message, 
                 text,
                 keyboard=nation_keyboard(
                     in_chat=in_chat, has_nation=has_nation, is_leader=is_leader
@@ -93,13 +96,22 @@ def register(bot: Bot) -> None:
 
     @bot.on.message(func=match_cmd("join_nation", "➕ вступить", "вступить"))
     async def join_handler(message: Message):
+        remember_chat_peer(message)
         name = await resolve_name(message)
+        chat_peer = resolve_chat_peer(message)
+        if not chat_peer:
+            await reply(
+                message,
+                "Вступить можно из беседы (или сначала открой «Страна» в беседе).",
+                keyboard=main_keyboard().get_json(),
+            )
+            return
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             try:
-                nation = await join_nation(session, player, message.peer_id)
+                nation = await join_nation(session, player, chat_peer)
             except NationError as e:
-                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                await reply(message, e.message, keyboard=main_keyboard().get_json())
                 return
             welcome = nation.welcome or "Добро пожаловать!"
             await notify_nation_chat(
@@ -107,7 +119,7 @@ def register(bot: Bot) -> None:
                 nation.chat_peer_id,
                 f"➕ {player.name} вступил в {nation.flag_emoji} {nation.name}!",
             )
-            await message.answer(
+            await reply(message, 
                 f"{welcome}\nТы в {nation.flag_emoji} {nation.name}.\n"
                 f"Налог страны: {int((nation.tax_rate or 0.1)*100)}%",
                 keyboard=main_keyboard().get_json(),
@@ -117,15 +129,19 @@ def register(bot: Bot) -> None:
         func=match_cmd("found_nation", "🏗 основать страну", "основать страну", "основать")
     )
     async def found_start(message: Message):
-        if not is_chat_peer(message.peer_id):
-            await message.answer(
-                "Основать страну можно только в беседе.",
+        remember_chat_peer(message)
+        chat_peer = resolve_chat_peer(message)
+        if not chat_peer:
+            await reply(message, 
+                "Основать страну можно только из беседы.\n"
+                "Напиши «Страна» в беседе, затем «Основать» в ЛС.",
                 keyboard=main_keyboard().get_json(),
             )
             return
-        _pending_found.add((message.peer_id, message.from_id))
-        await message.answer(
-            f"Название страны (2–32 символа).\nЦена: {config.NATION_FOUND_COST} крон.",
+        _pending_found[message.from_id] = chat_peer
+        await reply(message, 
+            f"Название страны (2–32 символа).\nЦена: {config.NATION_FOUND_COST} крон.\n"
+            f"Ответь сюда (в ЛС) названием.",
             keyboard=cancel_keyboard().get_json(),
         )
 
@@ -137,13 +153,13 @@ def register(bot: Bot) -> None:
             try:
                 msg = await leave_nation(session, player)
             except NationError as e:
-                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                await reply(message, e.message, keyboard=main_keyboard().get_json())
                 return
-            await message.answer(msg, keyboard=main_keyboard().get_json())
+            await reply(message, msg, keyboard=main_keyboard().get_json())
 
     @bot.on.message(func=match_cmd("dissolve_nation", "🗑 распустить", "распустить"))
     async def dissolve_ask(message: Message):
-        await message.answer(
+        await reply(message, 
             "⚠ Распустить страну навсегда?\nВсе граждане станут без страны (кулдаун 24ч).",
             keyboard=confirm_dissolve_keyboard().get_json(),
         )
@@ -156,10 +172,10 @@ def register(bot: Bot) -> None:
             try:
                 nation_name = await dissolve_nation(session, player)
             except NationError as e:
-                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                await reply(message, e.message, keyboard=main_keyboard().get_json())
                 return
             await add_event(session, "dissolve", f"Страна {nation_name} распущена")
-            await message.answer(
+            await reply(message, 
                 f"🗑 Страна {nation_name} удалена. Беседу можно основать заново.",
                 keyboard=main_keyboard().get_json(),
             )
@@ -170,7 +186,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             if not player.nation or player.nation.leader_id != player.vk_id:
-                await message.answer("Только лидер.", keyboard=main_keyboard().get_json())
+                await reply(message, "Только лидер.", keyboard=main_keyboard().get_json())
                 return
             citizens = [
                 c
@@ -178,12 +194,12 @@ def register(bot: Bot) -> None:
                 if c.vk_id != player.vk_id
             ]
             if not citizens:
-                await message.answer(
+                await reply(message, 
                     "Некому передавать трон (ты один).",
                     keyboard=main_keyboard().get_json(),
                 )
                 return
-            await message.answer(
+            await reply(message, 
                 "Выбери нового лидера:",
                 keyboard=citizens_keyboard(citizens).get_json(),
             )
@@ -198,74 +214,72 @@ def register(bot: Bot) -> None:
             try:
                 target = await transfer_leadership(session, player, target_id)
             except NationError as e:
-                await message.answer(e.message, keyboard=main_keyboard().get_json())
+                await reply(message, e.message, keyboard=main_keyboard().get_json())
                 return
             await notify_nation_chat(
                 message.ctx_api,
                 player.nation.chat_peer_id if player.nation else message.peer_id,
                 f"👑 Новый лидер: {target.name}!",
             )
-            await message.answer(
+            await reply(message, 
                 f"Трон передан: {target.name}",
                 keyboard=main_keyboard().get_json(),
             )
 
     @bot.on.message(func=match_cmd("cancel", "❌ отмена", "отмена"))
     async def cancel_found(message: Message):
-        key = (message.peer_id, message.from_id)
-        _pending_found.discard(key)
-        _pending_text.pop(key, None)
-        await message.answer("Отменено.", keyboard=main_keyboard().get_json())
+        _pending_found.pop(message.from_id, None)
+        _pending_text.pop(message.from_id, None)
+        await reply(message, "Отменено.", keyboard=main_keyboard().get_json())
 
     @bot.on.message(func=match_cmd("need_chat", "ℹ️ нужна беседа", "нужна беседа"))
     async def need_chat(message: Message):
-        await message.answer(
+        await reply(message, 
             "Добавь сообщество в беседу VK.",
             keyboard=main_keyboard().get_json(),
         )
 
     @bot.on.message(blocking=False)
     async def found_finish(message: Message):
-        key = (message.peer_id, message.from_id)
         text = (message.text or "").strip()
         if not text:
             return
 
         # customize text input
-        if key in _pending_text:
-            field = _pending_text.pop(key)
+        if message.from_id in _pending_text:
+            field = _pending_text.pop(message.from_id)
             name = await resolve_name(message)
             async with SessionLocal() as session:
                 player = await get_or_create_player(session, message.from_id, name)
                 try:
                     result = await set_field(session, player, field, text)
                 except CustomizeError as e:
-                    _pending_text[key] = field
-                    await message.answer(e.message, keyboard=cancel_keyboard().get_json())
+                    _pending_text[message.from_id] = field
+                    await reply(message, e.message, keyboard=cancel_keyboard().get_json())
                     return
                 cost_line = f"\n−{result['cost']} крон" if result["cost"] else ""
-                await message.answer(
+                await reply(message, 
                     f"Сохранено ({field}){cost_line}",
                     keyboard=customize_keyboard().get_json(),
                 )
             return
 
-        if key not in _pending_found:
+        if message.from_id not in _pending_found:
             return
         if text.casefold() in {r.casefold() for r in RESERVED}:
             return
         if (message.get_payload_json() or {}).get("cmd"):
             return
 
-        _pending_found.discard(key)
+        chat_peer = _pending_found.pop(message.from_id)
         name = await resolve_name(message)
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             try:
-                nation = await found_nation(session, player, message.peer_id, text)
+                nation = await found_nation(session, player, chat_peer, text)
             except NationError as e:
-                _pending_found.add(key)
-                await message.answer(e.message, keyboard=cancel_keyboard().get_json())
+                _pending_found[message.from_id] = chat_peer
+                await reply(message, e.message, keyboard=cancel_keyboard().get_json())
                 return
 
             await add_event(
@@ -279,7 +293,7 @@ def register(bot: Bot) -> None:
                 nation.chat_peer_id,
                 f"🎉 Основана страна {nation.flag_emoji} {nation.name}!\nЛидер: {player.name}",
             )
-            await message.answer(
+            await reply(message, 
                 f"🎉 Основана {nation.flag_emoji} {nation.name}!\n"
                 f"Оформи: 🎨 · Зови друзей: 📨",
                 keyboard=main_keyboard().get_json(),

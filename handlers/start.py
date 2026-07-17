@@ -2,7 +2,7 @@ from vkbottle.bot import Bot, Message
 
 from bot.config import is_admin
 from bot.keyboards import admin_keyboard
-from handlers.common import MENU_TEXT, ensure_player, user_keyboard
+from handlers.common import reply, MENU_TEXT, ensure_player, user_keyboard
 from handlers.rules import match_cmd, payload_cmd
 
 
@@ -16,7 +16,7 @@ async def _send_menu(message: Message) -> None:
     text = MENU_TEXT
     if is_admin(message.from_id):
         text += "\n\n🛠 Тебе доступна админка."
-    await message.answer(text, keyboard=user_keyboard(message.from_id))
+    await reply(message, text, keyboard=user_keyboard(message.from_id))
 
 
 def register(bot: Bot) -> None:

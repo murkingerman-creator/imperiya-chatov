@@ -1,3 +1,4 @@
+import math
 import random
 from datetime import timedelta
 
@@ -10,7 +11,7 @@ from services.auction import maybe_create_trophy
 from services.chatwars import add_score
 from services.item_effects import apply_raid_modifiers, get_loadout, try_consume_charge
 from services.loot import grant_drop
-from services.nation import get_nation_by_id, get_nation_by_name
+from services.nation import count_citizens, get_nation_by_id, get_nation_by_name
 from services.player import ensure_aware, utcnow
 from services.world_events import get_active_event, raid_cooldown, raid_multiplier
 
@@ -19,6 +20,42 @@ class WarError(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
+
+
+def _citizen_force(n: int) -> float:
+    """Сила от численности: каждый человек важен, сверхрост чуть слабее (√)."""
+    n = max(0, n)
+    return (
+        config.RAID_CITIZEN_WEIGHT * n
+        + config.RAID_CITIZEN_SQRT_WEIGHT * math.sqrt(n)
+    )
+
+
+def attack_force(citizens: int, raid_mult: float) -> float:
+    gear = max(0.0, float(raid_mult)) * config.RAID_GEAR_ATK_WEIGHT
+    return config.RAID_COMBAT_BASE + _citizen_force(citizens) + gear
+
+
+def defense_force(citizens: int, raid_defend: float) -> float:
+    # отрицательный defend (проклятие) ослабляет оборону
+    gear = float(raid_defend) * config.RAID_GEAR_DEF_WEIGHT
+    return max(0.5, config.RAID_COMBAT_BASE + _citizen_force(citizens) + gear)
+
+
+def win_chance(atk: float, dfn: float) -> float:
+    total = atk + dfn
+    if total <= 0:
+        return 0.5
+    p = atk / total
+    return max(config.RAID_WIN_CHANCE_MIN, min(config.RAID_WIN_CHANCE_MAX, p))
+
+
+def dominance_ratio(atk: float, dfn: float) -> float:
+    """0..1 — насколько атака сильнее в паре сил (без clamp шанса)."""
+    total = atk + dfn
+    if total <= 0:
+        return 0.5
+    return atk / total
 
 
 async def raid(
@@ -99,20 +136,56 @@ async def raid(
     def_player = def_leader.scalar_one_or_none()
     def_loadout = await get_loadout(session, def_player) if def_player else None
 
-    pct = random.uniform(config.RAID_STEAL_MIN_PCT, config.RAID_STEAL_MAX_PCT)
+    atk_citizens = await count_citizens(session, attacker.id)
+    def_citizens = await count_citizens(session, defender.id)
+
+    atk_mult = float(getattr(loadout, "raid_mult", 0.0) or 0.0)
+    defend_stat = 0.0
+    if def_loadout:
+        defend_stat = (
+            float(def_loadout.raid_defend or 0.0)
+            + float(def_loadout.nation_treasury_raid_defend or 0.0)
+        )
+
+    atk_pwr = attack_force(atk_citizens, atk_mult)
+    def_pwr = defense_force(def_citizens, defend_stat)
+    chance = win_chance(atk_pwr, def_pwr)
+    dominance = dominance_ratio(atk_pwr, def_pwr)
+
+    # КД всегда сгорает — попытка рейда
+    attacker.last_raid_at = now
+
+    rolled = random.random()
+    if rolled > chance:
+        await session.commit()
+        return {
+            "success": False,
+            "attacker": attacker,
+            "defender": defender,
+            "atk_citizens": atk_citizens,
+            "def_citizens": def_citizens,
+            "atk_power": round(atk_pwr, 1),
+            "def_power": round(def_pwr, 1),
+            "chance": chance,
+            "roll": rolled,
+            "charge_notes": charge_notes,
+        }
+
+    # --- победа: доля от казны зависит от перевеса, не чистый рандом ---
+    span = config.RAID_STEAL_MAX_PCT - config.RAID_STEAL_MIN_PCT
+    pct = config.RAID_STEAL_MIN_PCT + span * dominance
+    noise = 1.0 + random.uniform(-config.RAID_STEAL_NOISE, config.RAID_STEAL_NOISE)
+    pct = max(config.RAID_STEAL_MIN_PCT * 0.7, min(config.RAID_STEAL_MAX_PCT * 1.15, pct * noise))
+
     stolen = max(config.RAID_MIN_STEAL, int(defender.treasury * pct))
     stolen = int(stolen * raid_multiplier(ev))
     stolen, _ = apply_raid_modifiers(stolen, loadout)
 
-    defend = 0.0
-    if def_loadout:
-        defend = def_loadout.raid_defend + def_loadout.nation_treasury_raid_defend
-        # cursed black mark: negative defend on victim = more stolen
-        if defend < 0:
-            stolen = int(stolen * (1.0 - defend))
-            defend = 0.0
-        else:
-            stolen = int(stolen * (1.0 - min(0.35, defend)))
+    # доп. срез добычи экипом защиты (поверх уже учтённой силы в шансе)
+    if def_loadout and defend_stat > 0:
+        stolen = int(stolen * (1.0 - min(0.25, defend_stat * 0.5)))
+    elif defend_stat < 0:
+        stolen = int(stolen * (1.0 - defend_stat))
 
     stolen = min(stolen, defender.treasury)
 
@@ -138,7 +211,6 @@ async def raid(
         defender.treasury += reflected
     attacker.treasury += treasury_cut
     leader.crowns += leader_cut
-    attacker.last_raid_at = now
 
     session.add(
         WarLog(
@@ -170,6 +242,7 @@ async def raid(
     )
 
     return {
+        "success": True,
         "stolen": stolen,
         "leader_cut": leader_cut,
         "treasury_cut": treasury_cut,
@@ -182,6 +255,11 @@ async def raid(
         "drop": drop,
         "charge_notes": charge_notes,
         "reflected": reflected,
+        "atk_citizens": atk_citizens,
+        "def_citizens": def_citizens,
+        "atk_power": round(atk_pwr, 1),
+        "def_power": round(def_pwr, 1),
+        "chance": chance,
     }
 
 
@@ -213,8 +291,8 @@ async def raid_candidates(
 async def _nation_marked(session: AsyncSession, nation: Nation) -> bool:
     from sqlalchemy import select
 
-    from db.models import EquippedItem, Player
     from content import items_catalog as cat
+    from db.models import EquippedItem, Player
 
     result = await session.execute(
         select(Player.vk_id).where(Player.nation_id == nation.id)
