@@ -184,6 +184,15 @@ def register(bot: Bot) -> None:
             if not player.nation:
                 await reply(message, "Нужна страна.", keyboard=main_keyboard().get_json())
                 return
+            from services.roles import can_herald
+
+            if not await can_herald(session, player):
+                await reply(
+                    message,
+                    "Эмоции шлёт лидер или глашатай.",
+                    keyboard=main_keyboard().get_json(),
+                )
+                return
             n = player.nation
             extra = n.motto or n.laws or "Слава Империи чатов!"
             text = EMOTION_TEMPLATES[kind].format(

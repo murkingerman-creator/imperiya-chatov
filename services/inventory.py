@@ -172,6 +172,35 @@ async def unequip(session: AsyncSession, player: Player, slot: str) -> dict:
     return {"item": it, "slot": slot}
 
 
+async def upgrade_equipped(
+    session: AsyncSession, player: Player, item_id: str
+) -> dict:
+    equipped_result = await session.execute(
+        select(EquippedItem).where(
+            EquippedItem.player_vk_id == player.vk_id,
+            EquippedItem.item_id == item_id,
+        )
+    )
+    equipped = equipped_result.scalar_one_or_none()
+    if not equipped:
+        raise InventoryError("Предмет должен быть экипирован для улучшения.")
+    if equipped.upgrade >= config.UPGRADE_MAX:
+        raise InventoryError(f"Предмет уже улучшен до максимума (+{config.UPGRADE_MAX}).")
+    cost = config.UPGRADE_COST_PER_LEVEL * (equipped.upgrade + 1)
+    if player.crowns < cost:
+        raise InventoryError(f"Нужно {cost} крон (у тебя {player.crowns}).")
+    await _dec_bag(session, player.vk_id, item_id, 1)
+    player.crowns -= cost
+    equipped.upgrade += 1
+    await session.commit()
+    return {
+        "item": cat.get_item(item_id),
+        "upgrade": equipped.upgrade,
+        "cost": cost,
+        "crowns": player.crowns,
+    }
+
+
 async def _inc_bag(session: AsyncSession, vk_id: int, item_id: str, qty: int) -> None:
     result = await session.execute(
         select(InventoryItem).where(

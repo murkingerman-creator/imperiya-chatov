@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import config
 from content import items_catalog as cat
 from db.models import EquippedItem, ItemCharge, Player, PlayerBuff
-from services.inventory import get_equipped
 from services.player import ensure_aware, utcnow
 
 
@@ -39,11 +38,23 @@ class Loadout:
 
 
 async def get_loadout(session: AsyncSession, player: Player) -> Loadout:
-    equipped = await get_equipped(session, player.vk_id)
-    loadout = Loadout(items=list(equipped.values()))
+    result = await session.execute(
+        select(EquippedItem).where(EquippedItem.player_vk_id == player.vk_id)
+    )
+    equipped = []
+    for row in result.scalars().all():
+        item = cat.get_item(row.item_id)
+        if not item:
+            continue
+        item = dict(item)
+        item["_upgrade"] = row.upgrade or 0
+        equipped.append(item)
+    loadout = Loadout(items=equipped)
 
     for it in loadout.items:
-        _apply_passives(loadout, it.get("passives") or {})
+        passives = dict(it.get("passives") or {})
+        passives["_upgrade"] = it.get("_upgrade", 0)
+        _apply_passives(loadout, passives)
         if it.get("aura"):
             _apply_aura(loadout, it["aura"])
 
@@ -66,9 +77,11 @@ async def get_loadout(session: AsyncSession, player: Player) -> Loadout:
 
 
 def _apply_passives(loadout: Loadout, p: dict) -> None:
-    loadout.work_mult += float(p.get("work_mult") or 0)
-    loadout.raid_mult += float(p.get("raid_mult") or 0)
-    loadout.raid_defend += float(p.get("raid_defend") or 0)
+    upgrade = int(p.get("_upgrade") or 0)
+    scale = 1.0 + config.UPGRADE_BONUS_PER_LEVEL * upgrade
+    loadout.work_mult += float(p.get("work_mult") or 0) * scale
+    loadout.raid_mult += float(p.get("raid_mult") or 0) * scale
+    loadout.raid_defend += float(p.get("raid_defend") or 0) * scale
     loadout.raid_cd_hours += float(p.get("raid_cd_hours") or 0)
     loadout.raid_leader_share += float(p.get("raid_leader_share") or 0)
     loadout.tax_add += float(p.get("tax_add") or 0)

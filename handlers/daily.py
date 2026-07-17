@@ -1,11 +1,13 @@
 from vkbottle.bot import Bot, Message
 
-from bot.keyboards import main_keyboard
+from bot.keyboards import main_keyboard, onboarding_keyboard
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd
 from services.achievements import check_streak
+from services.announce import announce_nation
 from services.daily import DailyError, claim_daily
+from services.onboarding import advance_onboarding, onboarding_prompt
 from services.player import get_or_create_player
 
 
@@ -23,11 +25,24 @@ def register(bot: Bot) -> None:
 
             titles = await check_streak(session, player)
             title_line = f"\n🏅 {', '.join(titles)}" if titles else ""
-            await reply(message, 
+            onboard = await advance_onboarding(session, player, "daily")
+            onboard_line = f"\n{onboard}" if onboard else ""
+            text = (
                 f"🎁 Ежедневка получена!\n"
                 f"+{result['reward']} крон "
                 f"(база {result['base']} + стрик {result['bonus']})\n"
                 f"🔥 Стрик: {result['streak']} дн.\n"
-                f"💰 Баланс: {result['crowns']}{title_line}",
-                keyboard=main_keyboard().get_json(),
+                f"💰 Баланс: {result['crowns']}{title_line}{onboard_line}"
             )
+            await announce_nation(
+                message.ctx_api,
+                player.nation,
+                f"🎁 {player.name}: ежедневка (+{result['reward']})",
+            )
+            step = player.onboarding_step or 0
+            kb = (
+                onboarding_keyboard(step).get_json()
+                if step and onboarding_prompt(player)
+                else main_keyboard().get_json()
+            )
+            await reply(message, text, keyboard=kb)

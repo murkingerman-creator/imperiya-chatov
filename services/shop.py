@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import random
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import config
+from content import items_catalog as cat
 from db.models import Player
+from services.inventory import add_item
 from services.item_effects import get_buff, set_buff
 from services.player import ensure_aware, regenerate_energy, utcnow
 
@@ -51,7 +55,9 @@ def shop_catalog_text(player: Player) -> str:
         f"🏛 Вклад в казну — {config.SHOP_TREASURY_GIFT} "
         f"(твои кроны → казна страны)\n"
         f"⚔ Знамя рейда — {config.SHOP_RAID_BLESS_COST} "
-        f"(+{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс к следующему рейду)\n\n"
+        f"(+{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс к следующему рейду)\n"
+        f"🎰 Колесо удачи — {config.SHOP_WHEEL_COST} (кроны или предмет)\n"
+        f"🛡 Взнос в щит страны — {config.NATION_SHIELD_CONTRIB}\n\n"
         f"У тебя: {player.crowns} крон · ⚡ {player.energy}/{config.MAX_ENERGY}"
     )
 
@@ -146,3 +152,25 @@ async def buy_raid_bless(session: AsyncSession, player: Player) -> dict:
         "bonus_pct": int(config.SHOP_RAID_BLESS_BONUS * 100),
         "crowns": player.crowns,
     }
+
+
+async def buy_wheel(session: AsyncSession, player: Player) -> dict:
+    """Spin the imperial wheel for crowns or a randomly selected arsenal item."""
+    cost = config.SHOP_WHEEL_COST
+    if player.crowns < cost:
+        raise ShopError(f"Нужно {cost} крон (у тебя {player.crowns}).")
+    player.crowns -= cost
+    reward_type = random.choices(
+        ("crowns", "item"), weights=(45, 55), k=1
+    )[0]
+    if reward_type == "crowns":
+        amount = random.choices((25, 50, 100, 200), weights=(50, 30, 15, 5), k=1)[0]
+        player.crowns += amount
+        await session.commit()
+        return {"cost": cost, "type": "crowns", "amount": amount, "crowns": player.crowns}
+
+    items = cat.all_items()
+    weights = [config.LOOT_RARITY_WEIGHTS.get(item["rarity"], 1.0) for item in items]
+    item = random.choices(items, weights=weights, k=1)[0]
+    await add_item(session, player, item["id"])
+    return {"cost": cost, "type": "item", "item": item, "crowns": player.crowns}

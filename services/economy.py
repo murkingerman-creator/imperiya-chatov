@@ -221,6 +221,14 @@ async def finish_minigame(
 
     gross = max(1, int(base * mult * work_ev_mult))
     gross, item_mult = apply_work_modifiers(gross, loadout, game.job)
+    work_buff_until = (
+        ensure_aware(player.nation.work_buff_until)
+        if player.nation_id and player.nation
+        else None
+    )
+    if work_buff_until and work_buff_until > utcnow():
+        gross = max(1, int(gross * 1.10))
+        charge_notes.append("📜 Указ о труде: +10% доход")
     if free_mine_ok:
         gross *= 2
 
@@ -268,6 +276,13 @@ async def finish_minigame(
             charge_notes.append(f"⚡ {name}: энергия восстановлена")
 
     await session.commit()
+
+    if player.nation_id:
+        from services.weeklies import add_progress
+
+        await add_progress(session, player.nation_id, "jobs_total", 1)
+        if tax:
+            await add_progress(session, player.nation_id, "treasury_gain", tax)
 
     quest_extra = 0
     if "quest_x2" in loadout.charges_ready:

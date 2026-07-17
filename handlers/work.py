@@ -1,12 +1,14 @@
 from vkbottle.bot import Bot, Message
 
 from bot import config
-from bot.keyboards import jobs_keyboard, main_keyboard, minigame_keyboard
+from bot.keyboards import jobs_keyboard, main_keyboard, minigame_keyboard, onboarding_keyboard
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
+from services.announce import announce_nation
 from services.economy import WorkError, finish_minigame, start_minigame
 from services.item_effects import get_loadout
+from services.onboarding import advance_onboarding, onboarding_prompt
 from services.player import get_or_create_player
 
 
@@ -89,12 +91,29 @@ def register(bot: Bot) -> None:
             drop_line = f"\n✨ Дроп: {drop['text']}" if drop else ""
             notes = result.get("charge_notes") or []
             notes_line = ("\n" + "\n".join(notes)) if notes else ""
+            onboard = await advance_onboarding(session, player, "work")
+            onboard_line = f"\n{onboard}" if onboard else ""
 
-            await reply(message, 
+            drop_short = f", дроп {drop['text']}" if drop else ""
+            await announce_nation(
+                message.ctx_api,
+                player.nation,
+                f"💼 {player.name}: {result['title']} "
+                f"{'✓' if result['success'] else '✗'} +{result['net']}{drop_short}",
+            )
+
+            step = player.onboarding_step or 0
+            kb = (
+                onboarding_keyboard(step).get_json()
+                if step and onboarding_prompt(player)
+                else main_keyboard().get_json()
+            )
+            await reply(
+                message,
                 f"{result['title']}: {status}\n"
                 f"Заработано: +{result['gross']}{tax_line}{bonus_line}\n"
                 f"На руки: +{result['net']}\n"
                 f"💰 {result['crowns']} · ⚡ {result['energy']}"
-                f"{quest_line}{drop_line}{notes_line}",
-                keyboard=main_keyboard().get_json(),
+                f"{quest_line}{drop_line}{notes_line}{onboard_line}",
+                keyboard=kb,
             )

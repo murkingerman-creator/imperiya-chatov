@@ -32,6 +32,8 @@ _PLAYER_COLS = {
     "quest_jobs": "INTEGER DEFAULT 0",
     "quest_claimed": "INTEGER DEFAULT 0",
     "raid_wins": "INTEGER DEFAULT 0",
+    "onboarding_step": "INTEGER DEFAULT 0",
+    "last_chat_seen_at": "DATETIME",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",
@@ -45,6 +47,12 @@ _NATION_COLS = {
     "tax_rate": "FLOAT DEFAULT 0.10",
     "customized_at": "DATETIME",
     "election_at": "DATETIME",
+    "shield_until": "DATETIME",
+    "shield_pool": "INTEGER DEFAULT 0",
+    "work_buff_until": "DATETIME",
+}
+_EQUIPPED_COLS = {
+    "upgrade": "INTEGER DEFAULT 0",
 }
 
 
@@ -62,6 +70,7 @@ async def init_db() -> None:
         try:
             await _ensure_columns(conn, "players", _PLAYER_COLS)
             await _ensure_columns(conn, "nations", _NATION_COLS)
+            await _ensure_columns(conn, "equipped_items", _EQUIPPED_COLS)
         except Exception:
             pass
 

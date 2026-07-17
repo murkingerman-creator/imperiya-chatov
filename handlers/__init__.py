@@ -8,6 +8,7 @@ from handlers import (
     invite,
     market,
     nation,
+    nation_extra,
     profile,
     shop,
     start,
@@ -33,3 +34,23 @@ def register_all(bot) -> None:
     market.register(bot)
     shop.register(bot)
     nation.register(bot)
+    nation_extra.register(bot)
+
+    # активность в беседе страны → сила рейда
+    from db.database import SessionLocal
+    from handlers.common import is_chat_peer
+    from services.activity import touch_chat_activity
+    from services.nation import get_nation_by_chat
+
+    @bot.on.message(blocking=False)
+    async def track_chat_activity(message):
+        if not is_chat_peer(message.peer_id):
+            return
+        try:
+            async with SessionLocal() as session:
+                nation = await get_nation_by_chat(session, message.peer_id)
+                if not nation:
+                    return
+                await touch_chat_activity(session, message.from_id)
+        except Exception:
+            pass

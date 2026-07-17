@@ -25,8 +25,10 @@ from services.inventory import (
     merge_commons,
     sell_item,
     unequip,
+    upgrade_equipped,
 )
 from services.item_effects import format_loadout_short, get_loadout
+from services.announce import announce_nation
 from services.notify import post_wall
 from services.player import get_or_create_player
 
@@ -101,6 +103,32 @@ def register(bot: Bot) -> None:
                 await add_event(session, "mythic", announce, str(player.nation_id or ""))
                 await post_wall(message.ctx_api, announce)
                 text += "\n" + announce
+            await reply(message, text, keyboard=bag_keyboard().get_json())
+
+    @bot.on.message(func=payload_cmd("bag_upgrade"))
+    async def bag_upgrade(message: Message):
+        payload = message.get_payload_json() or {}
+        item_id = str(payload.get("id") or "")
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                result = await upgrade_equipped(session, player, item_id)
+            except InventoryError as e:
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
+                return
+            it = result["item"]
+            text = (
+                f"⚒ Заточка +{result['upgrade']}!\n"
+                f"{cat.format_item(it) if it else item_id}\n"
+                f"−{result['cost']} крон · 💰 {result['crowns']}"
+            )
+            await announce_nation(
+                message.ctx_api,
+                player.nation,
+                f"⚒ {player.name}: заточка +{result['upgrade']} "
+                f"({it['name'] if it else item_id})",
+            )
             await reply(message, text, keyboard=bag_keyboard().get_json())
 
     @bot.on.message(func=payload_cmd("bag_unequip"))

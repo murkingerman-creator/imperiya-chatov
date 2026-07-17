@@ -248,7 +248,60 @@ TITLE_LABELS = {
     "emperor": "👑 Император выборов",
     "collector": "📦 Коллекционер",
     "myth_finder": "🟥 Искатель мифов",
+    "novice": "🌱 Новичок",
+    "empire_season": "🏛 Империя сезона",
 }
+
+# Onboarding
+ONBOARD_REWARD_DAILY = 30
+ONBOARD_REWARD_WORK = 40
+ONBOARD_REWARD_NATION = 50
+
+# Raid activity (hours)
+RAID_ACTIVE_HOURS = 48
+RAID_FORCE_ALL_WEIGHT = 0.35
+RAID_FORCE_ACTIVE_WEIGHT = 0.65
+
+# Nation announce throttle
+NATION_ANNOUNCE_COOLDOWN_SEC = 8
+
+# Treasury spends
+TREASURY_WORK_EDICT = 80
+TREASURY_WAR_LEVY = 120
+TREASURY_PAYOUT = 150
+TREASURY_AMNESTY = 100
+TREASURY_SHIELD_ACTIVATE = 0  # pool-based
+TREASURY_WORK_BUFF_HOURS = 6
+TREASURY_WAR_LEVY_BONUS = 0.08
+NATION_SHIELD_CONTRIB = 50
+NATION_SHIELD_POOL_NEED = 200
+NATION_SHIELD_HOURS = 24
+NATION_SHIELD_CHANCE_MULT = 0.75
+
+# Weekly goals
+WEEKLY_REWARD_TREASURY = 250
+WEEKLY_TARGETS = {
+    "jobs_total": 40,
+    "treasury_gain": 500,
+    "raid_attempts": 3,
+}
+
+# Season
+SEASON_RAID_WIN = 2
+SEASON_RAID_DEFEND = 1
+SEASON_CHATWAR_WIN = 5
+
+# Lottery wheel
+SHOP_WHEEL_COST = 40
+
+# Item upgrade
+UPGRADE_MAX = 3
+UPGRADE_COST_PER_LEVEL = 40
+UPGRADE_BONUS_PER_LEVEL = 0.08
+
+# Wall flash
+WALL_FLASH_COOLDOWN_MIN = 30
+WALL_FLASH_RAID_MIN_STEAL = 80
 
 # Arsenal / loot
 LOOT_CHANCE_SUCCESS = 0.12

@@ -84,12 +84,17 @@ async def finish_due_wars(session: AsyncSession) -> list[str]:
         a = await get_nation_by_id(session, w.nation_a_id)
         b = await get_nation_by_id(session, w.nation_b_id)
         pot = w.stake * 2
+        from bot import config
+        from services.season import add_points
+
         if w.score_a > w.score_b and a:
             a.treasury += pot
             winner = f"{a.flag_emoji} {a.name}"
+            await add_points(session, a.id, config.SEASON_CHATWAR_WIN)
         elif w.score_b > w.score_a and b:
             b.treasury += pot
             winner = f"{b.flag_emoji} {b.name}"
+            await add_points(session, b.id, config.SEASON_CHATWAR_WIN)
         else:
             if a:
                 a.treasury += w.stake

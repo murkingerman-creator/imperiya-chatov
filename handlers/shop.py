@@ -14,10 +14,12 @@ from services.shop import (
     buy_energy_full,
     buy_raid_bless,
     buy_treasury_gift,
+    buy_wheel,
     buy_work_luck,
     jail_minutes_left,
     shop_catalog_text,
 )
+from services.announce import announce_nation
 
 
 def _bail_text(message: Message) -> bool:
@@ -65,6 +67,11 @@ async def _do_buy(message: Message, item: str) -> None:
                     f"Свобода (~{result['freed_min']} мин срока снято).\n"
                     f"💰 {result['crowns']}"
                 )
+                await announce_nation(
+                    message.ctx_api,
+                    player.nation,
+                    f"🔓 {player.name} выкупился из тюрьмы (−{result['cost']})",
+                )
             elif item == "energy":
                 result = await buy_energy_full(session, player)
                 text = (
@@ -93,6 +100,26 @@ async def _do_buy(message: Message, item: str) -> None:
                     f"+{result['bonus_pct']}% к шансу следующего рейда.\n"
                     f"💰 {result['crowns']}"
                 )
+            elif item == "wheel":
+                result = await buy_wheel(session, player)
+                if result["type"] == "crowns":
+                    text = (
+                        f"🎰 Колесо (−{result['cost']})!\n"
+                        f"+{result['amount']} крон\n💰 {result['crowns']}"
+                    )
+                else:
+                    it = result["item"]
+                    text = (
+                        f"🎰 Колесо (−{result['cost']})!\n"
+                        f"✨ {it.get('emoji', '')} {it['name']} ({it['rarity']})\n"
+                        f"💰 {result['crowns']}"
+                    )
+                    if it.get("rarity") in ("rare", "epic", "legendary", "mythic"):
+                        await announce_nation(
+                            message.ctx_api,
+                            player.nation,
+                            f"🎰 {player.name} выбил {it.get('emoji', '')} {it['name']}!",
+                        )
             else:
                 await reply(
                     message,

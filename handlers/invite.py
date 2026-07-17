@@ -7,6 +7,7 @@ from handlers.rules import match_cmd
 from services.nation import NationError, apply_invite
 from services.chronicle_store import add_event
 from services.notify import notify_nation_chat
+from services.onboarding import advance_onboarding
 from services.player import get_or_create_player
 from bot import config
 
@@ -74,8 +75,11 @@ def register(bot: Bot) -> None:
                     f"📨 {player.name} вступил по инвайту!",
                 )
 
-            await reply(message, 
+            onboard = await advance_onboarding(session, player, "nation")
+            onboard_line = f"\n{onboard}" if onboard else ""
+            await reply(
+                message,
                 f"✅ Инвайт!\n+{result['invitee_reward']} тебе\n"
-                f"+{result['inviter_reward']} пригласившему{extra}",
+                f"+{result['inviter_reward']} пригласившему{extra}{onboard_line}",
                 keyboard=main_keyboard().get_json(),
             )

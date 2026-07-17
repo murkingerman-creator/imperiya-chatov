@@ -29,6 +29,9 @@ class Nation(Base):
     last_raid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     customized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     election_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    shield_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    shield_pool: Mapped[int] = mapped_column(Integer, default=0)
+    work_buff_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -69,6 +72,8 @@ class Player(Base):
     quest_jobs: Mapped[int] = mapped_column(Integer, default=0)
     quest_claimed: Mapped[int] = mapped_column(Integer, default=0)
     raid_wins: Mapped[int] = mapped_column(Integer, default=0)
+    onboarding_step: Mapped[int] = mapped_column(Integer, default=0)  # 0=done, 1..3=steps
+    last_chat_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -181,6 +186,7 @@ class EquippedItem(Base):
     player_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
     slot: Mapped[str] = mapped_column(String(16))
     item_id: Mapped[str] = mapped_column(String(64))
+    upgrade: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class ItemCharge(Base):
@@ -231,3 +237,33 @@ class MarketListing(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class NationWeekly(Base):
+    __tablename__ = "nation_weeklies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(Integer, index=True)
+    week_key: Mapped[str] = mapped_column(String(16), index=True)
+    goal_type: Mapped[str] = mapped_column(String(32))
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    target: Mapped[int] = mapped_column(Integer, default=40)
+    claimed: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class NationRole(Base):
+    __tablename__ = "nation_roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(Integer, index=True)
+    vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    role: Mapped[str] = mapped_column(String(16))  # warlord | treasurer | herald
+
+
+class SeasonScore(Base):
+    __tablename__ = "season_scores"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    season_id: Mapped[str] = mapped_column(String(16), index=True)  # YYYY-MM
+    nation_id: Mapped[int] = mapped_column(Integer, index=True)
+    points: Mapped[int] = mapped_column(Integer, default=0)

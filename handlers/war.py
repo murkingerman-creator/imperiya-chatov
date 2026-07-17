@@ -6,11 +6,18 @@ from bot.keyboards import main_keyboard, raid_targets_keyboard
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
+from services.chronicle import post_flash
 from services.chronicle_store import add_event
-from services.nation import count_citizens
 from services.notify import notify_nation_chat
 from services.player import get_or_create_player
-from services.war import WarError, raid, raid_candidates
+from services.roles import can_raid
+from services.war import (
+    WarError,
+    nation_manpower,
+    preview_raid_odds,
+    raid,
+    raid_candidates,
+)
 
 RAID_RE = re.compile(r"^(?:⚔|рейд)\s+(.+)$", re.IGNORECASE)
 
@@ -20,9 +27,15 @@ def _is_raid_text(message: Message) -> bool:
 
 
 def _battle_line(result: dict) -> str:
+    atk_m = result.get("atk_manpower") or {}
+    def_m = result.get("def_manpower") or {}
     return (
-        f"⚔ Сила: {result['atk_power']} (👥{result['atk_citizens']}) "
-        f"vs {result['def_power']} (👥{result['def_citizens']})\n"
+        f"⚔ Сила: {result['atk_power']} "
+        f"(👥{atk_m.get('total', result.get('atk_citizens', '?'))}"
+        f"/{atk_m.get('active', '?')} акт.) "
+        f"vs {result['def_power']} "
+        f"(👥{def_m.get('total', result.get('def_citizens', '?'))}"
+        f"/{def_m.get('active', '?')} акт.)\n"
         f"Шанс успеха был {int(result['chance'] * 100)}%"
     )
 
@@ -42,10 +55,10 @@ def register(bot: Bot) -> None:
                 )
                 return
 
-            if player.nation.leader_id != player.vk_id:
+            if not await can_raid(session, player):
                 await reply(
                     message,
-                    f"Рейды объявляет только лидер.\n"
+                    f"Рейды — лидер или воевода.\n"
                     f"Твоя страна: {player.nation.flag_emoji} {player.nation.name}\n"
                     f"Казна: {player.nation.treasury}",
                     keyboard=main_keyboard().get_json(),
@@ -61,17 +74,22 @@ def register(bot: Bot) -> None:
                 )
                 return
 
-            my_n = await count_citizens(session, player.nation.id)
+            my = await nation_manpower(session, player.nation.id)
             lines = [
-                f"⚔ Рейд от {player.nation.flag_emoji} {player.nation.name} · 👥 {my_n}",
-                "Сила = граждане + экип. Больше людей — выше шанс и добыча.",
+                f"⚔ Рейд от {player.nation.flag_emoji} {player.nation.name}",
+                f"👥 {my['total']} (активны {my['active']} за 48ч)",
+                "Сила от активных граждан + экип. Шанс ~ до атаки.",
                 "Цель кнопкой или: рейд Название",
                 "",
             ]
             for t in targets:
-                n = await count_citizens(session, t.id)
+                odds = await preview_raid_odds(session, player.nation, t, player)
+                dm = odds["defender_manpower"]
+                shield = " 🛡" if odds["shielded"] else ""
                 lines.append(
-                    f"• {t.flag_emoji} {t.name} — казна {t.treasury} · 👥 {n}"
+                    f"• {t.flag_emoji} {t.name} — казна {t.treasury} · "
+                    f"👥{dm['total']}/{dm['active']}акт · "
+                    f"~{int(odds['chance'] * 100)}%{shield}"
                 )
 
             await reply(
@@ -121,7 +139,7 @@ async def _do_raid(message: Message, target: str) -> None:
             await notify_nation_chat(
                 message.ctx_api,
                 atk.chat_peer_id,
-                f"🛡 Рейд на {dfn.flag_emoji} {dfn.name} отбит. {battle}",
+                f"🛡 Рейд на {dfn.flag_emoji} {dfn.name} отбит.\n{battle}",
             )
             await notify_nation_chat(
                 message.ctx_api,
@@ -162,6 +180,15 @@ async def _do_raid(message: Message, target: str) -> None:
             f"Рейд {atk.flag_emoji} {atk.name} на {dfn.flag_emoji} {dfn.name} (−{result['stolen']})",
             f"{atk.id},{dfn.id}",
         )
+        from bot import config
+
+        if result["stolen"] >= config.WALL_FLASH_RAID_MIN_STEAL:
+            await post_flash(
+                message.ctx_api,
+                session,
+                f"⚔ {atk.flag_emoji} {atk.name} ограбили "
+                f"{dfn.flag_emoji} {dfn.name} на {result['stolen']}!",
+            )
         await notify_nation_chat(
             message.ctx_api,
             atk.chat_peer_id,

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot import config
 from bot.config import GROUP_ID
 from db.models import ChronicleEvent
 from services.chronicle_store import get_meta, set_meta
@@ -76,3 +77,21 @@ async def force_post_chronicle(api, session: AsyncSession) -> str:
         await session.delete(old)
     await session.commit()
     return text
+
+
+async def post_flash(api, session: AsyncSession, text: str) -> bool:
+    """Post a short wall announcement, respecting the global flash cooldown."""
+    now = utcnow()
+    raw_last = await get_meta(session, "last_flash_at")
+    if raw_last:
+        try:
+            last = datetime.fromisoformat(raw_last)
+            if last.tzinfo is None:
+                last = last.replace(tzinfo=timezone.utc)
+            if now < last + timedelta(minutes=config.WALL_FLASH_COOLDOWN_MIN):
+                return False
+        except ValueError:
+            pass
+    await post_wall(api, text)
+    await set_meta(session, "last_flash_at", now.isoformat())
+    return True

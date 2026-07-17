@@ -2,6 +2,7 @@ import math
 import random
 from datetime import timedelta
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import config
@@ -11,8 +12,11 @@ from services.auction import maybe_create_trophy
 from services.chatwars import add_score
 from services.item_effects import apply_raid_modifiers, get_loadout, try_consume_charge
 from services.loot import grant_drop
-from services.nation import count_citizens, get_nation_by_id, get_nation_by_name
+from services.nation import get_nation_by_id, get_nation_by_name
 from services.player import ensure_aware, utcnow
+from services.roles import can_raid
+from services.season import add_points
+from services.weeklies import add_progress
 from services.world_events import get_active_event, raid_cooldown, raid_multiplier
 
 
@@ -58,6 +62,40 @@ def dominance_ratio(atk: float, dfn: float) -> float:
     return atk / total
 
 
+async def nation_manpower(session: AsyncSession, nation_id: int) -> dict:
+    """Return total and recently active citizens for combat force calculations."""
+    result = await session.execute(
+        select(Player).where(Player.nation_id == nation_id)
+    )
+    citizens = list(result.scalars().all())
+    cutoff = utcnow() - timedelta(hours=config.RAID_ACTIVE_HOURS)
+    activity_fields = (
+        "last_work_at",
+        "last_chat_seen_at",
+        "last_mine_at",
+        "last_market_at",
+        "last_guard_at",
+        "last_fish_at",
+        "last_farm_at",
+        "last_forge_at",
+        "last_tavern_at",
+        "last_smuggle_at",
+    )
+    active = sum(
+        any(
+            (seen := ensure_aware(getattr(player, field, None))) and seen >= cutoff
+            for field in activity_fields
+        )
+        for player in citizens
+    )
+    total = len(citizens)
+    effective = (
+        config.RAID_FORCE_ALL_WEIGHT * total
+        + config.RAID_FORCE_ACTIVE_WEIGHT * active
+    )
+    return {"total": total, "active": active, "effective": effective}
+
+
 async def raid(
     session: AsyncSession,
     leader: Player,
@@ -70,8 +108,8 @@ async def raid(
     if not attacker:
         raise WarError("Страна не найдена.")
 
-    if attacker.leader_id != leader.vk_id:
-        raise WarError("Объявлять рейд может только лидер страны.")
+    if not await can_raid(session, leader):
+        raise WarError("Объявлять рейд может только лидер или воевода страны.")
 
     now = utcnow()
     ev = await get_active_event(session)
@@ -128,16 +166,14 @@ async def raid(
         raise WarError("У цели почти пустая казна — рейд невыгоден.")
 
     # defender loadout from their leader for reflect/defend
-    from sqlalchemy import select
-
     def_leader = await session.execute(
         select(Player).where(Player.vk_id == defender.leader_id)
     )
     def_player = def_leader.scalar_one_or_none()
     def_loadout = await get_loadout(session, def_player) if def_player else None
 
-    atk_citizens = await count_citizens(session, attacker.id)
-    def_citizens = await count_citizens(session, defender.id)
+    atk_manpower = await nation_manpower(session, attacker.id)
+    def_manpower = await nation_manpower(session, defender.id)
 
     atk_mult = float(getattr(loadout, "raid_mult", 0.0) or 0.0)
     defend_stat = 0.0
@@ -147,8 +183,8 @@ async def raid(
             + float(def_loadout.nation_treasury_raid_defend or 0.0)
         )
 
-    atk_pwr = attack_force(atk_citizens, atk_mult)
-    def_pwr = defense_force(def_citizens, defend_stat)
+    atk_pwr = attack_force(atk_manpower["effective"], atk_mult)
+    def_pwr = defense_force(def_manpower["effective"], defend_stat)
     chance = win_chance(atk_pwr, def_pwr)
     dominance = dominance_ratio(atk_pwr, def_pwr)
 
@@ -162,19 +198,41 @@ async def raid(
         charge_notes.append(
             f"⚔ Знамя рейда: +{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс"
         )
+    if await consume_buff_stack(session, leader.vk_id, "raid_levy"):
+        chance = min(
+            config.RAID_WIN_CHANCE_MAX,
+            chance + config.TREASURY_WAR_LEVY_BONUS,
+        )
+        charge_notes.append(
+            f"🏛 Военный сбор: +{int(config.TREASURY_WAR_LEVY_BONUS * 100)}% шанс"
+        )
+    shield_until = ensure_aware(defender.shield_until)
+    if shield_until and shield_until > now:
+        chance = max(
+            config.RAID_WIN_CHANCE_MIN,
+            min(
+                config.RAID_WIN_CHANCE_MAX,
+                chance * config.NATION_SHIELD_CHANCE_MULT,
+            ),
+        )
+        charge_notes.append("🛡 Щит страны снизил шанс рейда")
 
     # КД всегда сгорает — попытка рейда
     attacker.last_raid_at = now
+    await add_progress(session, attacker.id, "raid_attempts", 1)
 
     rolled = random.random()
     if rolled > chance:
+        await add_points(session, defender.id, config.SEASON_RAID_DEFEND)
         await session.commit()
         return {
             "success": False,
             "attacker": attacker,
             "defender": defender,
-            "atk_citizens": atk_citizens,
-            "def_citizens": def_citizens,
+            "atk_citizens": atk_manpower["effective"],
+            "def_citizens": def_manpower["effective"],
+            "atk_manpower": atk_manpower,
+            "def_manpower": def_manpower,
             "atk_power": round(atk_pwr, 1),
             "def_power": round(def_pwr, 1),
             "chance": chance,
@@ -222,6 +280,7 @@ async def raid(
         defender.treasury += reflected
     attacker.treasury += treasury_cut
     leader.crowns += leader_cut
+    await add_points(session, attacker.id, config.SEASON_RAID_WIN)
 
     session.add(
         WarLog(
@@ -266,11 +325,55 @@ async def raid(
         "drop": drop,
         "charge_notes": charge_notes,
         "reflected": reflected,
-        "atk_citizens": atk_citizens,
-        "def_citizens": def_citizens,
+        "atk_citizens": atk_manpower["effective"],
+        "def_citizens": def_manpower["effective"],
+        "atk_manpower": atk_manpower,
+        "def_manpower": def_manpower,
         "atk_power": round(atk_pwr, 1),
         "def_power": round(def_pwr, 1),
         "chance": chance,
+    }
+
+
+async def preview_raid_odds(
+    session: AsyncSession,
+    attacker_nation: Nation,
+    defender_nation: Nation,
+    leader: Player,
+) -> dict:
+    """Calculate current odds without spending charges or starting a cooldown."""
+    attacker_manpower = await nation_manpower(session, attacker_nation.id)
+    defender_manpower = await nation_manpower(session, defender_nation.id)
+    loadout = await get_loadout(session, leader)
+    result = await session.execute(
+        select(Player).where(Player.vk_id == defender_nation.leader_id)
+    )
+    defender_leader = result.scalar_one_or_none()
+    defender_loadout = (
+        await get_loadout(session, defender_leader) if defender_leader else None
+    )
+    defend = 0.0
+    if defender_loadout:
+        defend = (
+            float(defender_loadout.raid_defend or 0.0)
+            + float(defender_loadout.nation_treasury_raid_defend or 0.0)
+        )
+    attack = attack_force(attacker_manpower["effective"], loadout.raid_mult)
+    defense = defense_force(defender_manpower["effective"], defend)
+    chance = win_chance(attack, defense)
+    shield_until = ensure_aware(defender_nation.shield_until)
+    if shield_until and shield_until > utcnow():
+        chance = max(
+            config.RAID_WIN_CHANCE_MIN,
+            min(config.RAID_WIN_CHANCE_MAX, chance * config.NATION_SHIELD_CHANCE_MULT),
+        )
+    return {
+        "chance": chance,
+        "atk_power": round(attack, 1),
+        "def_power": round(defense, 1),
+        "attacker_manpower": attacker_manpower,
+        "defender_manpower": defender_manpower,
+        "shielded": bool(shield_until and shield_until > utcnow()),
     }
 
 

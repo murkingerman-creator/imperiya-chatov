@@ -16,6 +16,7 @@ from handlers.common import reply, resolve_chat_peer, resolve_name, remember_cha
 from handlers.rules import match_cmd, payload_cmd
 from services.chronicle_store import add_event
 from services.customize import CustomizeError, set_field
+from services.onboarding import advance_onboarding
 from services.nation import (
     NationError,
     count_citizens,
@@ -121,7 +122,8 @@ def register(bot: Bot) -> None:
             )
             await reply(message, 
                 f"{welcome}\nТы в {nation.flag_emoji} {nation.name}.\n"
-                f"Налог страны: {int((nation.tax_rate or 0.1)*100)}%",
+                f"Налог страны: {int((nation.tax_rate or 0.1)*100)}%"
+                + (f"\n{ob}" if (ob := await advance_onboarding(session, player, "nation")) else ""),
                 keyboard=main_keyboard().get_json(),
             )
 
@@ -293,9 +295,18 @@ def register(bot: Bot) -> None:
                 nation.chat_peer_id,
                 f"🎉 Основана страна {nation.flag_emoji} {nation.name}!\nЛидер: {player.name}",
             )
+            from services.chronicle import post_flash
+
+            await post_flash(
+                message.ctx_api,
+                session,
+                f"🏛 Основана {nation.flag_emoji} {nation.name}! Лидер: {player.name}",
+            )
+            onboard = await advance_onboarding(session, player, "nation")
+            onboard_line = f"\n{onboard}" if onboard else ""
             await reply(message, 
                 f"🎉 Основана {nation.flag_emoji} {nation.name}!\n"
-                f"Оформи: 🎨 · Зови друзей: 📨",
+                f"Оформи: 🎨 · Зови друзей: 📨{onboard_line}",
                 keyboard=main_keyboard().get_json(),
             )
 

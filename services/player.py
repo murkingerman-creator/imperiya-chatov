@@ -50,6 +50,7 @@ async def get_or_create_player(
         energy_updated_at=utcnow(),
         invite_code=generate_invite_code(),
         daily_streak=0,
+        onboarding_step=1,
     )
     session.add(player)
     await session.commit()
