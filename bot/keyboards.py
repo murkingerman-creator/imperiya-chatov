@@ -18,8 +18,9 @@ def main_keyboard(*, is_admin: bool = False) -> Keyboard:
     kb.add(Text("📨 Инвайт", {"cmd": "invite"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text("🏆 Топ", {"cmd": "top_nations"}), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
+    kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     if is_admin:
         kb.add(Text("🛠 Админ", {"cmd": "admin"}), color=KeyboardButtonColor.PRIMARY)
@@ -37,6 +38,7 @@ def more_keyboard() -> Keyboard:
     kb.add(Text("⚔ Война бесед", {"cmd": "chatwar"}), color=KeyboardButtonColor.NEGATIVE)
     kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -290,4 +292,91 @@ def confirm_dissolve_keyboard() -> Keyboard:
         color=KeyboardButtonColor.NEGATIVE,
     )
     kb.add(Text("❌ Отмена", {"cmd": "nation"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def bag_keyboard(page: int = 0, has_next: bool = False) -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("🛡 Экипировка", {"cmd": "bag_eq"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📖 Кодекс", {"cmd": "codex"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    if page > 0:
+        kb.add(Text("⬅", {"cmd": "bag", "page": page - 1}))
+    if has_next:
+        kb.add(Text("➡", {"cmd": "bag", "page": page + 1}))
+    kb.row()
+    kb.add(Text("⚡ Заряды", {"cmd": "bag_charges"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def bag_items_keyboard(items: list[tuple], page: int, has_next: bool = False) -> Keyboard:
+    """items: list of (item_dict, qty) for current page."""
+    kb = Keyboard(one_time=True, inline=False)
+    for i, (it, qty) in enumerate(items):
+        if i and i % 2 == 0:
+            kb.row()
+        label = f"{it['name'][:14]}×{qty}"
+        kb.add(Text(label, {"cmd": "bag_item", "id": it["id"]}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    if page > 0:
+        kb.add(Text("⬅", {"cmd": "bag", "page": page - 1}))
+    if has_next:
+        kb.add(Text("➡", {"cmd": "bag", "page": page + 1}))
+    kb.row()
+    kb.add(Text("🛡 Экип", {"cmd": "bag_eq"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📖 Кодекс", {"cmd": "codex"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("⚡ Заряды", {"cmd": "bag_charges"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def item_actions_keyboard(item_id: str, rarity: str) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    kb.add(Text("✅ Экип", {"cmd": "bag_equip", "id": item_id}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("💰 Продать", {"cmd": "bag_sell", "id": item_id}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    if rarity == "common":
+        kb.add(Text("🔀 Слить×3", {"cmd": "bag_merge", "id": item_id}), color=KeyboardButtonColor.SECONDARY)
+    if rarity in ("epic", "legendary", "mythic"):
+        kb.add(Text("🏛 В казну", {"cmd": "bag_donate", "id": item_id}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def unequip_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    for slot, label in [("tool", "Инструмент"), ("weapon", "Оружие"), ("relic", "Реликвия")]:
+        kb.add(Text(f"Снять {label}", {"cmd": "bag_unequip", "slot": slot}))
+    kb.row()
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def charge_activate_keyboard(codes: list[str]) -> Keyboard:
+    from services.charges import MANUAL_CHARGES
+
+    kb = Keyboard(one_time=True, inline=False)
+    for code in codes:
+        if code == "tax_override_week":
+            continue
+        label = MANUAL_CHARGES.get(code, code)[:36]
+        kb.add(Text(label, {"cmd": "bag_charge", "code": code}), color=KeyboardButtonColor.POSITIVE)
+        kb.row()
+    if "tax_override_week" in codes:
+        for rate in config.TAX_PRESETS:
+            kb.add(
+                Text(
+                    f"Налог {int(rate * 100)}%",
+                    {
+                        "cmd": "bag_charge",
+                        "code": "tax_override_week",
+                        "tax": str(rate),
+                    },
+                )
+            )
+        kb.row()
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.SECONDARY)
     return kb

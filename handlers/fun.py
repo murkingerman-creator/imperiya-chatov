@@ -105,18 +105,31 @@ def register(bot: Bot) -> None:
             if result["success"]:
                 title_line = f"\n🏅 Титул: {result['title']}" if result.get("title") else ""
                 tax_line = f"\nНалог: −{result['tax']}" if result["tax"] else ""
+                drop = result.get("drop")
+                drop_line = f"\n✨ Дроп: {drop['text']}" if drop else ""
+                notes = result.get("charge_notes") or []
+                notes_line = ("\n" + "\n".join(notes)) if notes else ""
                 await message.answer(
                     f"🕶 Контрабанда удалась! ×3\n"
                     f"+{result['gross']}{tax_line}\n"
                     f"На руки: +{result['net']}\n"
-                    f"💰 {result['crowns']}{title_line}",
+                    f"💰 {result['crowns']}{title_line}{drop_line}{notes_line}",
                     keyboard=jobs_keyboard().get_json(),
                 )
             else:
+                drop = result.get("drop")
+                drop_line = f"\n✨ Дроп: {drop['text']}" if drop else ""
+                notes = result.get("charge_notes") or []
+                notes_line = ("\n" + "\n".join(notes)) if notes else ""
+                jail_line = (
+                    f" · тюрьма {result['jail_hours']}ч"
+                    if result.get("jailed")
+                    else " · без тюрьмы"
+                )
                 await message.answer(
                     f"🚔 Поймали!\n"
-                    f"Штраф −{result['fine']} · тюрьма {result['jail_hours']}ч\n"
-                    f"💰 {result['crowns']}",
+                    f"Штраф −{result['fine']}{jail_line}\n"
+                    f"💰 {result['crowns']}{drop_line}{notes_line}",
                     keyboard=main_keyboard().get_json(),
                 )
 

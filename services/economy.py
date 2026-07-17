@@ -33,7 +33,7 @@ def _job_last_attr(job: str) -> str:
     return {"mine": "last_mine_at", "market": "last_market_at", "guard": "last_guard_at"}[job]
 
 
-def check_can_start_job(player: Player, job: str) -> dict:
+def check_can_start_job(player: Player, job: str, *, skip_cd: bool = False) -> dict:
     if job not in config.JOBS:
         raise WorkError("Неизвестная работа.")
     regenerate_energy(player)
@@ -43,21 +43,24 @@ def check_can_start_job(player: Player, job: str) -> dict:
         raise WorkError(f"Ты в тюрьме ещё ~{left} мин.")
     spec = config.JOBS[job]
     now = utcnow()
-    last = ensure_aware(getattr(player, _job_last_attr(job)))
-    if last:
-        ready_at = last + timedelta(minutes=spec["cooldown_min"])
-        if now < ready_at:
-            minutes_left = int((ready_at - now).total_seconds() / 60) + 1
-            raise WorkError(
-                f"{spec['title']}: кулдаун. Подожди ещё ~{minutes_left} мин."
-            )
+    if not skip_cd:
+        last = ensure_aware(getattr(player, _job_last_attr(job)))
+        if last:
+            ready_at = last + timedelta(minutes=spec["cooldown_min"])
+            if now < ready_at:
+                minutes_left = int((ready_at - now).total_seconds() / 60) + 1
+                raise WorkError(
+                    f"{spec['title']}: кулдаун. Подожди ещё ~{minutes_left} мин."
+                )
     if player.energy < 1:
         raise WorkError("Недостаточно энергии.")
     return spec
 
 
-def start_minigame(player: Player, job: str) -> dict:
-    check_can_start_job(player, job)
+def start_minigame(
+    player: Player, job: str, *, skip_cd: bool = False, charge_flags: dict | None = None
+) -> dict:
+    check_can_start_job(player, job, skip_cd=skip_cd)
     token = secrets.token_hex(4)
     now_ts = utcnow().timestamp()
 
@@ -94,7 +97,8 @@ def start_minigame(player: Player, job: str) -> dict:
         ]
         meta = {"faces": faces}
 
-    # drop old sessions for user
+    meta.update(charge_flags or {})
+
     for k, s in list(_sessions.items()):
         if s.vk_id == player.vk_id or s.expires_at < now_ts:
             _sessions.pop(k, None)
@@ -113,6 +117,15 @@ def start_minigame(player: Player, job: str) -> dict:
 async def finish_minigame(
     session: AsyncSession, player: Player, token: str, answer: str
 ) -> dict:
+    from services.item_effects import (
+        apply_work_modifiers,
+        consume_buff_stack,
+        get_buff,
+        get_loadout,
+        set_buff,
+        try_consume_charge,
+    )
+    from services.loot import grant_drop
     from services.quests import on_job_done
     from services.world_events import get_active_event, tax_modifier, work_multiplier
 
@@ -122,24 +135,71 @@ async def finish_minigame(
     if utcnow().timestamp() > game.expires_at:
         raise WorkError("Время вышло. Попробуй работу снова.")
 
-    spec = check_can_start_job(player, game.job)
+    skip_cd = bool(game.meta.get("free_mine"))
+    spec = check_can_start_job(player, game.job, skip_cd=skip_cd)
     success = answer == game.correct
+    loadout = await get_loadout(session, player)
+
+    charge_notes: list[str] = []
+    free_mine_ok = False
+
+    # free mine charge consume
+    if game.meta.get("free_mine"):
+        name = await try_consume_charge(session, player, "free_mine_x2", loadout)
+        if name:
+            free_mine_ok = True
+            charge_notes.append(f"⚡ {name}: шахта без КД ×2")
+            loadout = await get_loadout(session, player)
+
+    # activate no_tax_3 if ready and no active buff
+    buff = await get_buff(session, player.vk_id, "no_tax_3")
+    if (not buff or buff.stacks <= 0) and "no_tax_3" in loadout.charges_ready:
+        name = await try_consume_charge(session, player, "no_tax_3", loadout)
+        if name:
+            await set_buff(session, player.vk_id, "no_tax_3", 3)
+            charge_notes.append(f"⚡ {name}: 3 работы без налога")
+            buff = await get_buff(session, player.vk_id, "no_tax_3")
+
     base = random.randint(spec["reward_min"], spec["reward_max"])
     mult = spec["success_mult"] if success else spec["fail_mult"]
     ev = await get_active_event(session)
-    gross = max(1, int(base * mult * work_multiplier(ev)))
+    event_key = ev["key"] if ev else None
+
+    # personal gold vein / ignore plague
+    work_ev_mult = work_multiplier(ev)
+    if loadout.personal_gold_vein:
+        work_ev_mult = max(work_ev_mult, 1.5)
+        event_key = "gold_vein"
+    if event_key == "plague" and "ignore_plague" in loadout.charges_ready:
+        name = await try_consume_charge(session, player, "ignore_plague", loadout)
+        if name:
+            work_ev_mult = 1.0
+            charge_notes.append(f"⚡ {name}: чума не действует")
+
+    gross = max(1, int(base * mult * work_ev_mult))
+    gross, item_mult = apply_work_modifiers(gross, loadout, game.job)
+    if free_mine_ok:
+        gross *= 2
 
     tax = 0
     nation_name = None
     treasury_bonus = 0
-    if player.nation_id and player.nation:
+    no_tax = await consume_buff_stack(session, player.vk_id, "no_tax_3")
+    if no_tax:
+        charge_notes.append("🏛 Налог: 0 (заряд)")
+
+    if player.nation_id and player.nation and not no_tax:
         nation_name = player.nation.name
-        tax_rate = (player.nation.tax_rate or config.TAX_RATE) + tax_modifier(ev)
+        tax_rate = (
+            (player.nation.tax_rate or config.TAX_RATE)
+            + tax_modifier(ev)
+            + loadout.tax_add
+        )
         tax_rate = max(0.0, min(0.4, tax_rate))
         tax = max(1, int(gross * tax_rate))
         player.nation.treasury += tax
         if success and game.job == "guard":
-            treasury_bonus = int(spec.get("treasury_bonus", 0))
+            treasury_bonus = int(spec.get("treasury_bonus", 0)) + loadout.treasury_bonus_add
             player.nation.treasury += treasury_bonus
 
     net = gross - tax
@@ -149,8 +209,56 @@ async def finish_minigame(
     setattr(player, _job_last_attr(game.job), now)
     player.last_work_at = now
     player.energy_updated_at = now
+
+    # full energy on successful guard
+    if success and game.job == "guard" and "full_energy_guard" in loadout.charges_ready:
+        name = await try_consume_charge(session, player, "full_energy_guard", loadout)
+        if name:
+            player.energy = config.MAX_ENERGY
+            charge_notes.append(f"⚡ {name}: энергия восстановлена")
+
     await session.commit()
+
+    quest_extra = 0
+    if "quest_x2" in loadout.charges_ready:
+        name = await try_consume_charge(session, player, "quest_x2", loadout)
+        if name:
+            quest_extra = 1
+            charge_notes.append(f"⚡ {name}: квест ×2")
+
     quest = await on_job_done(session, player)
+    if quest_extra:
+        quest = await on_job_done(session, player)
+
+    drop = await grant_drop(
+        session,
+        player,
+        game.job,
+        success=success,
+        job=game.job,
+        event_key=event_key,
+        loot_luck=loadout.loot_luck,
+    )
+    if game.job == "mine" and "double_loot_mine" in loadout.charges_ready:
+        name = await try_consume_charge(session, player, "double_loot_mine", loadout)
+        if name:
+            drop2 = await grant_drop(
+                session,
+                player,
+                "mine",
+                success=True,
+                job="mine",
+                event_key=event_key,
+                loot_luck=loadout.loot_luck + 0.05,
+            )
+            charge_notes.append(f"⚡ {name}: двойной дроп")
+            if drop2 and not drop:
+                drop = drop2
+            elif drop2:
+                drop = {
+                    **drop2,
+                    "text": f"{drop['text'] if drop else ''}\n{drop2['text']}".strip(),
+                }
 
     return {
         "success": success,
@@ -165,10 +273,12 @@ async def finish_minigame(
         "treasury_bonus": treasury_bonus,
         "correct": game.correct,
         "quest": quest,
+        "drop": drop,
+        "charge_notes": charge_notes,
+        "item_mult": item_mult,
     }
 
 
-# legacy helper for smoke tests
 async def do_work(session: AsyncSession, player: Player) -> dict:
     """Быстрая работа без мини-игры (совместимость / тесты)."""
     regenerate_energy(player)

@@ -3,6 +3,7 @@ from handlers import (
     customize,
     daily,
     fun,
+    inventory,
     invite,
     nation,
     profile,
@@ -24,4 +25,5 @@ def register_all(bot) -> None:
     invite.register(bot)
     customize.register(bot)
     fun.register(bot)
+    inventory.register(bot)
     nation.register(bot)

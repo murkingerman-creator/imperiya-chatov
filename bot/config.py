@@ -185,7 +185,27 @@ TITLE_LABELS = {
     "duelist": "🥊 Дуэлянт",
     "questor": "🗺 Квестовик",
     "emperor": "👑 Император выборов",
+    "collector": "📦 Коллекционер",
+    "myth_finder": "🟥 Искатель мифов",
 }
+
+# Arsenal / loot
+LOOT_CHANCE_SUCCESS = 0.12
+LOOT_CHANCE_FAIL = 0.05
+LOOT_GUARD_SUCCESS_BONUS = 0.03
+LOOT_SMUGGLE_SUCCESS = 0.15
+LOOT_RAID_CHANCE = 0.08
+LOOT_RARITY_WEIGHTS = {
+    "common": 70.0,
+    "uncommon": 20.0,
+    "rare": 7.0,
+    "epic": 2.2,
+    "legendary": 0.7,
+    "mythic": 0.1,
+}
+WORK_MULT_CAP = 0.35
+RAID_MULT_CAP = 0.25
+MERGE_COMMON_COUNT = 3
 
 
 def require_config() -> None:

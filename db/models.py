@@ -159,3 +159,54 @@ class ChatWar(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class InventoryItem(Base):
+    __tablename__ = "inventory_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    item_id: Mapped[str] = mapped_column(String(64), index=True)
+    qty: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class EquippedItem(Base):
+    __tablename__ = "equipped_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    slot: Mapped[str] = mapped_column(String(16))
+    item_id: Mapped[str] = mapped_column(String(64))
+
+
+class ItemCharge(Base):
+    __tablename__ = "item_charges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    item_id: Mapped[str] = mapped_column(String(64))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DiscoveredItem(Base):
+    __tablename__ = "discovered_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    item_id: Mapped[str] = mapped_column(String(64))
+    discovered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PlayerBuff(Base):
+    """Временные заряды легенд (например no_tax_3 оставшиеся работы)."""
+
+    __tablename__ = "player_buffs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    buff_code: Mapped[str] = mapped_column(String(32))
+    stacks: Mapped[int] = mapped_column(Integer, default=0)
+    meta: Mapped[str] = mapped_column(String(128), default="")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

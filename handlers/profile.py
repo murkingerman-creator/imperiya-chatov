@@ -6,6 +6,7 @@ from db.database import SessionLocal
 from handlers.common import resolve_name
 from handlers.rules import match_cmd
 from services.achievements import format_titles
+from services.inventory import discovered_count, get_equipped
 from services.player import (
     energy_next_in_minutes,
     ensure_aware,
@@ -14,6 +15,7 @@ from services.player import (
     utcnow,
 )
 from services.world_events import format_event, get_active_event
+from data import items_catalog as cat
 
 
 def register(bot: Bot) -> None:
@@ -25,6 +27,8 @@ def register(bot: Bot) -> None:
             regenerate_energy(player)
             await session.commit()
             ev = await get_active_event(session)
+            equipped = await get_equipped(session, player.vk_id)
+            codex_n = await discovered_count(session, player.vk_id)
 
             nation_line = "не в стране"
             if player.nation:
@@ -45,12 +49,20 @@ def register(bot: Bot) -> None:
                 left = int((until - utcnow()).total_seconds() / 60) + 1
                 jail_line = f"\n🚔 Тюрьма: ещё ~{left} мин"
 
+            eq_line = (
+                ", ".join(cat.format_item(it) for it in equipped.values())
+                if equipped
+                else "пусто"
+            )
+
             text = (
                 f"👤 {player.name}\n"
                 f"💰 Кроны: {player.crowns}\n"
                 f"⚡ Энергия: {player.energy}/{config.MAX_ENERGY} ({energy_hint})\n"
                 f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"
                 f"🏅 Титулы: {format_titles(player)}\n"
+                f"🎒 Экип: {eq_line}\n"
+                f"📖 Кодекс: {codex_n}/{cat.catalog_size()}\n"
                 f"📨 Код: {player.invite_code}\n"
                 f"🏛 Страна: {nation_line}"
                 f"{jail_line}\n"

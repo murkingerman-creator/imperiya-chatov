@@ -97,6 +97,14 @@ async def _do_raid(message: Message, target: str) -> None:
                 f"\n🏷 Трофей на аукционе: {trophy.item_name} "
                 f"(#{trophy.id}, старт {trophy.bid})"
             )
+        drop = result.get("drop")
+        if drop:
+            extra += f"\n✨ Дроп: {drop['text']}"
+        notes = result.get("charge_notes") or []
+        if notes:
+            extra += "\n" + "\n".join(notes)
+        if result.get("reflected"):
+            extra += f"\n🛡 Отражено защитой: {result['reflected']}"
         text = (
             f"⚔ Рейд!\n"
             f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
