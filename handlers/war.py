@@ -88,11 +88,21 @@ async def _do_raid(message: Message, target: str) -> None:
 
         atk = result["attacker"]
         dfn = result["defender"]
+        extra = ""
+        if result.get("titles"):
+            extra += f"\n🏅 {', '.join(result['titles'])}"
+        trophy = result.get("trophy")
+        if trophy:
+            extra += (
+                f"\n🏷 Трофей на аукционе: {trophy.item_name} "
+                f"(#{trophy.id}, старт {trophy.bid})"
+            )
         text = (
             f"⚔ Рейд!\n"
             f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
             f"Захвачено: {result['stolen']}\n"
             f"В казну: +{result['treasury_cut']} · Лидеру: +{result['leader_cut']}"
+            f"{extra}"
         )
         await add_event(
             session,

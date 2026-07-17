@@ -1,4 +1,16 @@
-from handlers import admin, customize, daily, invite, nation, profile, start, tops, war, work
+from handlers import (
+    admin,
+    customize,
+    daily,
+    fun,
+    invite,
+    nation,
+    profile,
+    start,
+    tops,
+    war,
+    work,
+)
 
 
 def register_all(bot) -> None:
@@ -11,4 +23,5 @@ def register_all(bot) -> None:
     war.register(bot)
     invite.register(bot)
     customize.register(bot)
+    fun.register(bot)
     nation.register(bot)

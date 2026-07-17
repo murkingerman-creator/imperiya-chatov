@@ -12,14 +12,126 @@ def main_keyboard(*, is_admin: bool = False) -> Keyboard:
     kb.add(Text("🏛 Страна", {"cmd": "nation"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
     kb.add(Text("⚔ Война", {"cmd": "war"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("🎲 Дуэль", {"cmd": "duel_menu"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("🎭 Эмоции", {"cmd": "emotions"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("📨 Инвайт", {"cmd": "invite"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
-    kb.add(Text("🏆 Топ стран", {"cmd": "top_nations"}), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🏆 Топ", {"cmd": "top_nations"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     if is_admin:
         kb.add(Text("🛠 Админ", {"cmd": "admin"}), color=KeyboardButtonColor.PRIMARY)
+    return kb
+
+
+def more_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("🌤 Ивент дня", {"cmd": "world_event"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📦 Квест", {"cmd": "quest"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("🏷 Аукцион", {"cmd": "auction"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🗳 Выборы", {"cmd": "election"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("⚔ Война бесед", {"cmd": "chatwar"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def emotions_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    kb.add(Text("🎉 Праздник", {"cmd": "emo", "kind": "party"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("⚔ К бою!", {"cmd": "emo", "kind": "war"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("🎵 Гимн", {"cmd": "emo", "kind": "anthem"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("😢 Траур", {"cmd": "emo", "kind": "sad"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def duel_menu_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("✊ КНБ 50", {"cmd": "duel_create", "mode": "rps", "bet": 50}))
+    kb.add(Text("✊ КНБ 100", {"cmd": "duel_create", "mode": "rps", "bet": 100}))
+    kb.row()
+    kb.add(Text("🔢 Число 50", {"cmd": "duel_create", "mode": "number", "bet": 50}))
+    kb.add(Text("🔢 Число 100", {"cmd": "duel_create", "mode": "number", "bet": 100}))
+    kb.row()
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def duel_accept_keyboard(token: str) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    kb.add(
+        Text("✅ Принять дуэль", {"cmd": "duel_accept", "token": token}),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(Text("❌ Отмена", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def rps_keyboard(token: str) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    for label, move in [("✊ Камень", "rock"), ("✋ Бумага", "paper"), ("✌ Ножницы", "scissors")]:
+        kb.add(Text(label, {"cmd": "duel_move", "token": token, "move": move}))
+    return kb
+
+
+def number_keyboard(token: str) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    for n in range(1, 6):
+        kb.add(Text(str(n), {"cmd": "duel_move", "token": token, "move": str(n)}))
+        if n == 3:
+            kb.row()
+    return kb
+
+
+def auction_keyboard(auctions: list) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    for i, a in enumerate(auctions[:6]):
+        if i and i % 2 == 0:
+            kb.row()
+        nxt = a.bid + 25
+        kb.add(
+            Text(f"#{a.id} →{nxt}", {"cmd": "auction_bid", "id": a.id, "amount": nxt}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+    kb.row()
+    kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def election_citizens_keyboard(citizens: list) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    for i, p in enumerate(citizens[:8]):
+        if i and i % 2 == 0:
+            kb.row()
+        kb.add(
+            Text(p.name[:18] or str(p.vk_id), {"cmd": "election_vote", "vk_id": p.vk_id}),
+            color=KeyboardButtonColor.PRIMARY,
+        )
+    kb.row()
+    kb.add(Text("🏁 Завершить", {"cmd": "election_finish"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def chatwar_targets_keyboard(names: list[str]) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    for i, name in enumerate(names[:6]):
+        if i and i % 2 == 0:
+            kb.row()
+        kb.add(
+            Text(f"⚔ {name}", {"cmd": "chatwar_start", "target": name}),
+            color=KeyboardButtonColor.NEGATIVE,
+        )
+    kb.row()
+    kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 
@@ -48,6 +160,7 @@ def jobs_keyboard() -> Keyboard:
     kb.add(Text("🛒 Рынок", {"cmd": "job", "job": "market"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text("🛡 Охрана", {"cmd": "job", "job": "guard"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("🕶 Контрабанда", {"cmd": "smuggle"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb

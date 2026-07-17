@@ -92,6 +92,36 @@ RAID_STEAL_MAX_PCT = 0.15
 RAID_MIN_STEAL = 10
 RAID_LEADER_SHARE = 0.30
 RAID_TREASURY_SHARE = 0.70
+RAID_NIGHT_COOLDOWN_MINUTES = 15  # during raid night
+
+# Smuggle
+SMUGGLE_COOLDOWN_MIN = 60
+SMUGGLE_SUCCESS_CHANCE = 0.45
+SMUGGLE_REWARD_MIN = 80
+SMUGGLE_REWARD_MAX = 200
+SMUGGLE_JAIL_HOURS = 1
+
+# Duels
+DUEL_MIN_BET = 20
+DUEL_MAX_BET = 500
+DUEL_TTL_SEC = 120
+
+# Elections
+ELECTION_DAYS = 7
+
+# Quests
+QUEST_JOBS_NEEDED = 3
+QUEST_REWARD_MIN = 100
+QUEST_REWARD_MAX = 180
+
+# Auction
+AUCTION_HOURS = 6
+AUCTION_START_BID = 50
+TROPHY_CHANCE = 0.35
+
+# Chat war
+CHAT_WAR_HOURS = 24
+CHAT_WAR_STAKE = 150
 
 # Legacy alias
 WORK_COOLDOWN_MINUTES = 60
@@ -102,6 +132,60 @@ GOVERNMENTS = ("монархия", "республика", "олигархия",
 COLORS = ("алый", "лазурь", "изумруд", "янтарь", "пурпур", "снег", "обсидиан")
 FLAGS = ("🏛", "🏴", "🏳️", "🚩", "🦅", "🐉", "🦁", "🐺", "🦊", "🐻", "🌹", "⭐")
 EMBLEMS = ("⚔️", "🛡️", "👑", "🔥", "❄️", "🌙", "☀️", "⚡", "💎", "🏹")
+
+WORLD_EVENTS = {
+    "plague": {
+        "title": "🕷 Чума",
+        "desc": "Доход с работ −40%, налог стран +5 п.п.",
+        "work_mult": 0.6,
+        "tax_add": 0.05,
+        "raid_mult": 1.0,
+        "raid_cd_mult": 1.0,
+    },
+    "fair": {
+        "title": "🎪 Ярмарка",
+        "desc": "Доход с работ +30%, рейды −20% добычи",
+        "work_mult": 1.3,
+        "tax_add": 0.0,
+        "raid_mult": 0.8,
+        "raid_cd_mult": 1.0,
+    },
+    "revolt": {
+        "title": "🔥 Восстание",
+        "desc": "Рейды +40% добычи, кулдаун рейда быстрее",
+        "work_mult": 0.9,
+        "tax_add": -0.02,
+        "raid_mult": 1.4,
+        "raid_cd_mult": 0.7,
+    },
+    "gold_vein": {
+        "title": "✨ Золотая жила",
+        "desc": "Доход с работ +50%",
+        "work_mult": 1.5,
+        "tax_add": 0.0,
+        "raid_mult": 1.0,
+        "raid_cd_mult": 1.0,
+    },
+    "raid_night": {
+        "title": "🌙 Ночь рейдов",
+        "desc": "Кулдаун рейда 15 минут!",
+        "work_mult": 1.0,
+        "tax_add": 0.0,
+        "raid_mult": 1.15,
+        "raid_cd_mult": 0.0,  # special: use RAID_NIGHT minutes
+        "raid_night": True,
+    },
+}
+
+TITLE_LABELS = {
+    "first_raid": "⚔ Первый рейд",
+    "streak_7": "🔥 Стрик 7",
+    "treasury_10k": "🏦 Казна 10к",
+    "smuggler": "🕶 Контрабандист",
+    "duelist": "🥊 Дуэлянт",
+    "questor": "🗺 Квестовик",
+    "emperor": "👑 Император выборов",
+}
 
 
 def require_config() -> None:

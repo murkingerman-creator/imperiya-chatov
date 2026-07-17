@@ -15,7 +15,8 @@ def register(bot: Bot) -> None:
             "💼 Выбери работу (у каждой свой кулдаун и мини-игра):\n"
             "⛏ Шахта — дольше, стабильно\n"
             "🛒 Рынок — чаще, риск\n"
-            "🛡 Охрана — редко, жирно + казна",
+            "🛡 Охрана — редко, жирно + казна\n"
+            "🕶 Контрабанда — ×3 или тюрьма на час",
             keyboard=jobs_keyboard().get_json(),
         )
 
@@ -60,11 +61,21 @@ def register(bot: Bot) -> None:
             bonus_line = ""
             if result["treasury_bonus"]:
                 bonus_line = f"\n➕ В казну страны: +{result['treasury_bonus']}"
+            quest = result.get("quest") or {}
+            quest_line = ""
+            if quest:
+                if quest.get("ready"):
+                    quest_line = "\n📦 Квест готов — забери сундук в «Ещё»!"
+                else:
+                    quest_line = (
+                        f"\n📦 Квест: {quest.get('progress', 0) % quest.get('needed', 3)}"
+                        f"/{quest.get('needed', 3)}"
+                    )
 
             await message.answer(
                 f"{result['title']}: {status}\n"
                 f"Заработано: +{result['gross']}{tax_line}{bonus_line}\n"
                 f"На руки: +{result['net']}\n"
-                f"💰 {result['crowns']} · ⚡ {result['energy']}",
+                f"💰 {result['crowns']} · ⚡ {result['energy']}{quest_line}",
                 keyboard=main_keyboard().get_json(),
             )

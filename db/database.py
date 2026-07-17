@@ -17,11 +17,17 @@ _PLAYER_COLS = {
     "last_mine_at": "DATETIME",
     "last_market_at": "DATETIME",
     "last_guard_at": "DATETIME",
+    "last_smuggle_at": "DATETIME",
     "daily_streak": "INTEGER DEFAULT 0",
     "last_daily_at": "DATETIME",
     "nation_left_at": "DATETIME",
     "invite_code": "VARCHAR(16) DEFAULT ''",
     "referred_by_vk_id": "BIGINT",
+    "jail_until": "DATETIME",
+    "titles": "VARCHAR(512) DEFAULT ''",
+    "quest_jobs": "INTEGER DEFAULT 0",
+    "quest_claimed": "INTEGER DEFAULT 0",
+    "raid_wins": "INTEGER DEFAULT 0",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",
@@ -34,6 +40,7 @@ _NATION_COLS = {
     "welcome": "VARCHAR(120) DEFAULT ''",
     "tax_rate": "FLOAT DEFAULT 0.10",
     "customized_at": "DATETIME",
+    "election_at": "DATETIME",
 }
 
 

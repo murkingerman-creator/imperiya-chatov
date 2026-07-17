@@ -5,7 +5,15 @@ from bot.keyboards import main_keyboard
 from db.database import SessionLocal
 from handlers.common import resolve_name
 from handlers.rules import match_cmd
-from services.player import energy_next_in_minutes, get_or_create_player, regenerate_energy
+from services.achievements import format_titles
+from services.player import (
+    energy_next_in_minutes,
+    ensure_aware,
+    get_or_create_player,
+    regenerate_energy,
+    utcnow,
+)
+from services.world_events import format_event, get_active_event
 
 
 def register(bot: Bot) -> None:
@@ -16,6 +24,7 @@ def register(bot: Bot) -> None:
             player = await get_or_create_player(session, message.from_id, name)
             regenerate_energy(player)
             await session.commit()
+            ev = await get_active_event(session)
 
             nation_line = "не в стране"
             if player.nation:
@@ -30,12 +39,21 @@ def register(bot: Bot) -> None:
                 else f"+1 через ~{next_e} мин"
             )
 
+            jail_line = ""
+            until = ensure_aware(player.jail_until)
+            if until and utcnow() < until:
+                left = int((until - utcnow()).total_seconds() / 60) + 1
+                jail_line = f"\n🚔 Тюрьма: ещё ~{left} мин"
+
             text = (
                 f"👤 {player.name}\n"
                 f"💰 Кроны: {player.crowns}\n"
                 f"⚡ Энергия: {player.energy}/{config.MAX_ENERGY} ({energy_hint})\n"
                 f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"
+                f"🏅 Титулы: {format_titles(player)}\n"
                 f"📨 Код: {player.invite_code}\n"
                 f"🏛 Страна: {nation_line}"
+                f"{jail_line}\n"
+                f"{format_event(ev)}"
             )
             await message.answer(text, keyboard=main_keyboard().get_json())

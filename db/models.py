@@ -28,6 +28,7 @@ class Nation(Base):
     treasury: Mapped[int] = mapped_column(Integer, default=0)
     last_raid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     customized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    election_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -53,11 +54,17 @@ class Player(Base):
     last_mine_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_market_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_guard_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_smuggle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     daily_streak: Mapped[int] = mapped_column(Integer, default=0)
     last_daily_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     nation_left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     invite_code: Mapped[str] = mapped_column(String(16), default="", index=True)
     referred_by_vk_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    jail_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    titles: Mapped[str] = mapped_column(String(512), default="")  # comma-separated codes
+    quest_jobs: Mapped[int] = mapped_column(Integer, default=0)
+    quest_claimed: Mapped[int] = mapped_column(Integer, default=0)
+    raid_wins: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -106,4 +113,49 @@ class MetaKV(Base):
     __tablename__ = "meta_kv"
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
-    value: Mapped[str] = mapped_column(String(256), default="")
+    value: Mapped[str] = mapped_column(String(512), default="")
+
+
+class TrophyAuction(Base):
+    __tablename__ = "trophy_auctions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    item_name: Mapped[str] = mapped_column(String(64))
+    seller_nation_id: Mapped[int] = mapped_column(Integer)
+    bid: Mapped[int] = mapped_column(Integer, default=0)
+    bidder_vk_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    bidder_nation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ElectionVote(Base):
+    __tablename__ = "election_votes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(Integer, index=True)
+    voter_vk_id: Mapped[int] = mapped_column(BigInteger)
+    candidate_vk_id: Mapped[int] = mapped_column(BigInteger)
+    election_key: Mapped[str] = mapped_column(String(32), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ChatWar(Base):
+    __tablename__ = "chat_wars"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nation_a_id: Mapped[int] = mapped_column(Integer)
+    nation_b_id: Mapped[int] = mapped_column(Integer)
+    score_a: Mapped[int] = mapped_column(Integer, default=0)
+    score_b: Mapped[int] = mapped_column(Integer, default=0)
+    stake: Mapped[int] = mapped_column(Integer, default=100)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

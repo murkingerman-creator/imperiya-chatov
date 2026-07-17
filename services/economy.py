@@ -37,6 +37,10 @@ def check_can_start_job(player: Player, job: str) -> dict:
     if job not in config.JOBS:
         raise WorkError("Неизвестная работа.")
     regenerate_energy(player)
+    until = ensure_aware(player.jail_until)
+    if until and utcnow() < until:
+        left = int((until - utcnow()).total_seconds() / 60) + 1
+        raise WorkError(f"Ты в тюрьме ещё ~{left} мин.")
     spec = config.JOBS[job]
     now = utcnow()
     last = ensure_aware(getattr(player, _job_last_attr(job)))
@@ -109,6 +113,9 @@ def start_minigame(player: Player, job: str) -> dict:
 async def finish_minigame(
     session: AsyncSession, player: Player, token: str, answer: str
 ) -> dict:
+    from services.quests import on_job_done
+    from services.world_events import get_active_event, tax_modifier, work_multiplier
+
     game = _sessions.pop(token, None)
     if not game or game.vk_id != player.vk_id:
         raise WorkError("Мини-игра не найдена или устарела. Начни работу заново.")
@@ -119,15 +126,16 @@ async def finish_minigame(
     success = answer == game.correct
     base = random.randint(spec["reward_min"], spec["reward_max"])
     mult = spec["success_mult"] if success else spec["fail_mult"]
-    gross = max(1, int(base * mult))
+    ev = await get_active_event(session)
+    gross = max(1, int(base * mult * work_multiplier(ev)))
 
     tax = 0
     nation_name = None
     treasury_bonus = 0
-    tax_rate = config.TAX_RATE
     if player.nation_id and player.nation:
         nation_name = player.nation.name
-        tax_rate = player.nation.tax_rate or config.TAX_RATE
+        tax_rate = (player.nation.tax_rate or config.TAX_RATE) + tax_modifier(ev)
+        tax_rate = max(0.0, min(0.4, tax_rate))
         tax = max(1, int(gross * tax_rate))
         player.nation.treasury += tax
         if success and game.job == "guard":
@@ -142,6 +150,7 @@ async def finish_minigame(
     player.last_work_at = now
     player.energy_updated_at = now
     await session.commit()
+    quest = await on_job_done(session, player)
 
     return {
         "success": success,
@@ -155,6 +164,7 @@ async def finish_minigame(
         "nation_name": nation_name,
         "treasury_bonus": treasury_bonus,
         "correct": game.correct,
+        "quest": quest,
     }
 
 

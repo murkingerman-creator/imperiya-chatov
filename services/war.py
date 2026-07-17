@@ -5,8 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import config
 from db.models import Nation, Player, WarLog
+from services.achievements import check_after_raid, check_treasury
+from services.auction import maybe_create_trophy
+from services.chatwars import add_score
 from services.nation import get_nation_by_id, get_nation_by_name
 from services.player import ensure_aware, utcnow
+from services.world_events import get_active_event, raid_cooldown, raid_multiplier
 
 
 class WarError(Exception):
@@ -31,12 +35,16 @@ async def raid(
         raise WarError("Объявлять рейд может только лидер страны.")
 
     now = utcnow()
+    ev = await get_active_event(session)
     last = ensure_aware(attacker.last_raid_at)
+    cd = raid_cooldown(ev)
     if last:
-        ready_at = last + timedelta(hours=config.RAID_COOLDOWN_HOURS)
+        ready_at = last + cd
         if now < ready_at:
-            hours_left = (ready_at - now).total_seconds() / 3600
-            raise WarError(f"Рейд на перезарядке. Осталось ~{hours_left:.1f} ч.")
+            left = (ready_at - now).total_seconds()
+            if left >= 3600:
+                raise WarError(f"Рейд на перезарядке. Осталось ~{left/3600:.1f} ч.")
+            raise WarError(f"Рейд на перезарядке. Осталось ~{int(left/60)+1} мин.")
 
     defender = await get_nation_by_name(session, target_name)
     if not defender:
@@ -50,6 +58,7 @@ async def raid(
 
     pct = random.uniform(config.RAID_STEAL_MIN_PCT, config.RAID_STEAL_MAX_PCT)
     stolen = max(config.RAID_MIN_STEAL, int(defender.treasury * pct))
+    stolen = int(stolen * raid_multiplier(ev))
     stolen = min(stolen, defender.treasury)
 
     leader_cut = int(stolen * config.RAID_LEADER_SHARE)
@@ -69,6 +78,11 @@ async def raid(
     )
     await session.commit()
 
+    titles = await check_after_raid(session, leader)
+    titles += await check_treasury(session, leader)
+    trophy = await maybe_create_trophy(session, attacker)
+    await add_score(session, attacker.id, 1)
+
     return {
         "stolen": stolen,
         "leader_cut": leader_cut,
@@ -76,6 +90,9 @@ async def raid(
         "attacker": attacker,
         "defender": defender,
         "leader_crowns": leader.crowns,
+        "titles": titles,
+        "trophy": trophy,
+        "event": ev,
     }
 
 
