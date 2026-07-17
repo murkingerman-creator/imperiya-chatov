@@ -10,7 +10,7 @@ from bot.keyboards import (
     market_menu_keyboard,
     market_price_keyboard,
 )
-from data import items_catalog as cat
+from content import items_catalog as cat
 from db.database import SessionLocal
 from db.models import Player
 from handlers.common import resolve_name

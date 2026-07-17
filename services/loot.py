@@ -7,7 +7,7 @@ import random
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import config
-from data import items_catalog as cat
+from content import items_catalog as cat
 from db.models import Player
 from services.inventory import add_item
 

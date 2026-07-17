@@ -8,7 +8,7 @@ from bot.keyboards import (
     main_keyboard,
     unequip_keyboard,
 )
-from data import items_catalog as cat
+from content import items_catalog as cat
 from db.database import SessionLocal
 from handlers.common import resolve_name
 from handlers.rules import match_cmd, payload_cmd

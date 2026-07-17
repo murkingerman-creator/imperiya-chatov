@@ -214,7 +214,7 @@ async def _nation_marked(session: AsyncSession, nation: Nation) -> bool:
     from sqlalchemy import select
 
     from db.models import EquippedItem, Player
-    from data import items_catalog as cat
+    from content import items_catalog as cat
 
     result = await session.execute(
         select(Player.vk_id).where(Player.nation_id == nation.id)

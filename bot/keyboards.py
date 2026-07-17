@@ -384,7 +384,7 @@ def market_listings_keyboard(
     for i, listing in enumerate(listings[:6]):
         if i and i % 2 == 0:
             kb.row()
-        from data import items_catalog as cat
+        from content import items_catalog as cat
 
         it = cat.get_item(listing.item_id)
         name = (it["name"] if it else listing.item_id)[:12]

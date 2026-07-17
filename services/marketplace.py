@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import config
-from data import items_catalog as cat
+from content import items_catalog as cat
 from db.models import EquippedItem, MarketListing, Player
 from services.inventory import InventoryError, _dec_bag, _inc_bag, _mark_discovered
 from services.player import ensure_aware, utcnow

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from bot import config
-from data import items_catalog as cat
+from content import items_catalog as cat
 from services.item_effects import Loadout, apply_raid_modifiers, apply_work_modifiers
 from services.loot import roll_drop
 

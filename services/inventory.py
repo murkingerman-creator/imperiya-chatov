@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import config
-from data import items_catalog as cat
+from content import items_catalog as cat
 from db.models import DiscoveredItem, EquippedItem, InventoryItem, Player
 from services.achievements import grant_title
 from services.player import utcnow

@@ -15,7 +15,7 @@ from services.player import (
     utcnow,
 )
 from services.world_events import format_event, get_active_event
-from data import items_catalog as cat
+from content import items_catalog as cat
 
 
 def register(bot: Bot) -> None:
