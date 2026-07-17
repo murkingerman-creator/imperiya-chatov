@@ -51,7 +51,9 @@ def check_can_start_job(player: Player, job: str, *, skip_cd: bool = False) -> d
     until = ensure_aware(player.jail_until)
     if until and utcnow() < until:
         left = int((until - utcnow()).total_seconds() / 60) + 1
-        raise WorkError(f"Ты в тюрьме ещё ~{left} мин.")
+        raise WorkError(
+            f"Ты в тюрьме ещё ~{left} мин. Выкуп за кроны: 🔓 / 🏪 Лавка."
+        )
     spec = config.JOBS[job]
     now = utcnow()
     if not skip_cd:
@@ -221,6 +223,13 @@ async def finish_minigame(
     gross, item_mult = apply_work_modifiers(gross, loadout, game.job)
     if free_mine_ok:
         gross *= 2
+
+    if await consume_buff_stack(session, player.vk_id, "work_luck"):
+        bonus = 1.0 + config.SHOP_WORK_LUCK_BONUS
+        gross = max(1, int(gross * bonus))
+        charge_notes.append(
+            f"🍀 Печать удачи: +{int(config.SHOP_WORK_LUCK_BONUS * 100)}%"
+        )
 
     tax = 0
     nation_name = None

@@ -152,6 +152,17 @@ async def raid(
     chance = win_chance(atk_pwr, def_pwr)
     dominance = dominance_ratio(atk_pwr, def_pwr)
 
+    from services.item_effects import consume_buff_stack
+
+    if await consume_buff_stack(session, leader.vk_id, "raid_bless"):
+        chance = min(
+            config.RAID_WIN_CHANCE_MAX,
+            chance + config.SHOP_RAID_BLESS_BONUS,
+        )
+        charge_notes.append(
+            f"⚔ Знамя рейда: +{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс"
+        )
+
     # КД всегда сгорает — попытка рейда
     attacker.last_raid_at = now
 

@@ -47,7 +47,13 @@ def register(bot: Bot) -> None:
             until = ensure_aware(player.jail_until)
             if until and utcnow() < until:
                 left = int((until - utcnow()).total_seconds() / 60) + 1
-                jail_line = f"\n🚔 Тюрьма: ещё ~{left} мин"
+                from services.shop import bail_cost
+
+                cost = bail_cost(player)
+                jail_line = (
+                    f"\n🚔 Тюрьма: ещё ~{left} мин"
+                    f" · выкуп {cost} крон (🔓 / 🏪 Лавка)"
+                )
 
             eq_line = (
                 ", ".join(cat.format_item(it) for it in equipped.values())

@@ -22,7 +22,9 @@ def assert_not_jailed(player: Player) -> None:
     until = ensure_aware(player.jail_until)
     if until and utcnow() < until:
         left = int((until - utcnow()).total_seconds() / 60) + 1
-        raise SmuggleError(f"Ты в тюрьме ещё ~{left} мин. Контрабанда недоступна.")
+        raise SmuggleError(
+            f"Ты в тюрьме ещё ~{left} мин. Выкуп: 🔓 / 🏪 Лавка."
+        )
 
 
 async def do_smuggle(session: AsyncSession, player: Player) -> dict:

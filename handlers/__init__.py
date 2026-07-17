@@ -9,6 +9,7 @@ from handlers import (
     market,
     nation,
     profile,
+    shop,
     start,
     tops,
     war,
@@ -30,4 +31,5 @@ def register_all(bot) -> None:
     fun.register(bot)
     inventory.register(bot)
     market.register(bot)
+    shop.register(bot)
     nation.register(bot)

@@ -20,9 +20,10 @@ def main_keyboard(*, is_admin: bool = False) -> Keyboard:
     kb.add(Text("🏆 Топ", {"cmd": "top_nations"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text("📖 Как играть", {"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
+    kb.add(Text("📖 Как играть", {"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     if is_admin:
         kb.add(Text("🛠 Админ", {"cmd": "admin"}), color=KeyboardButtonColor.PRIMARY)
@@ -37,13 +38,48 @@ def more_keyboard() -> Keyboard:
     kb.add(Text("🏷 Аукцион", {"cmd": "auction"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("🛒 Торг", {"cmd": "market"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
-    kb.add(Text("🗳 Выборы", {"cmd": "election"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("⚔ Война бесед", {"cmd": "chatwar"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
+    kb.add(Text("🗳 Выборы", {"cmd": "election"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text("📖 Как играть", {"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📖 Как играть", {"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def shop_keyboard(*, jailed: bool = False) -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    if jailed:
+        kb.add(
+            Text("🔓 Выкуп", {"cmd": "shop_buy", "item": "bail"}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+        kb.row()
+    kb.add(
+        Text("⚡ Эликсир", {"cmd": "shop_buy", "item": "energy"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
+    kb.add(
+        Text("🍀 Удача", {"cmd": "shop_buy", "item": "work_luck"}),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.row()
+    kb.add(
+        Text("🏛 В казну", {"cmd": "shop_buy", "item": "treasury"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
+    kb.add(
+        Text("⚔ Знамя", {"cmd": "shop_buy", "item": "raid_bless"}),
+        color=KeyboardButtonColor.NEGATIVE,
+    )
+    kb.row()
+    if not jailed:
+        kb.add(
+            Text("🔓 Выкуп", {"cmd": "shop_buy", "item": "bail"}),
+            color=KeyboardButtonColor.SECONDARY,
+        )
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -174,6 +210,9 @@ def jobs_keyboard() -> Keyboard:
     kb.row()
     kb.add(Text("🛡 Охрана", {"cmd": "job", "job": "guard"}), color=KeyboardButtonColor.NEGATIVE)
     kb.add(Text("🕶 Контрабанда", {"cmd": "smuggle"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("🔓 Выкуп", {"cmd": "shop_buy", "item": "bail"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
