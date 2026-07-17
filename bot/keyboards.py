@@ -219,6 +219,11 @@ def admin_keyboard() -> Keyboard:
     kb.add(Text("🗑 Удалить страну", {"cmd": "adm_del_nation"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
     kb.add(Text("📜 Пост хроники", {"cmd": "adm_chronicle"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("📣 В беседы", {"cmd": "adm_bcast_chats"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("✉️ В ЛС", {"cmd": "adm_bcast_dms"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("📣✉️ Везде", {"cmd": "adm_bcast_all"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 

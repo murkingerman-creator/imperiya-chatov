@@ -7,6 +7,7 @@ from handlers.common import reply, resolve_name, user_keyboard
 from handlers.rules import match_cmd, payload_cmd
 from services import admin as admin_svc
 from services.admin import AdminError
+from services.broadcast import broadcast, format_report
 from services.chronicle import force_post_chronicle
 from services.nation import NationError, dissolve_nation_by_name
 from services.player import get_or_create_player
@@ -47,7 +48,10 @@ def register(bot: Bot) -> None:
             "• !игрок ID\n"
             "• !кд ID\n"
             "• !энергия ID\n"
-            "• !удалитьстрану Название\n",
+            "• !удалитьстрану Название\n"
+            "• !объявление текст — во все беседы+ЛС\n"
+            "• !объявление_беседы текст\n"
+            "• !объявление_лс текст\n",
             keyboard=admin_keyboard().get_json(),
         )
 
@@ -89,6 +93,43 @@ def register(bot: Bot) -> None:
                 "📜 Хроника отправлена на стену группы.\n\n" + text[:800],
                 keyboard=admin_keyboard().get_json(),
             )
+
+    @bot.on.message(func=payload_cmd("adm_bcast_chats"))
+    async def adm_bcast_chats_ask(message: Message):
+        if not await _require(message):
+            return
+        _pending[(message.peer_id, message.from_id)] = "bcast_chats"
+        await reply(
+            message,
+            "📣 Рассылка во все беседы стран.\n"
+            "Напиши текст объявления одним сообщением (или «отмена»).",
+            keyboard=cancel_keyboard().get_json(),
+        )
+
+    @bot.on.message(func=payload_cmd("adm_bcast_dms"))
+    async def adm_bcast_dms_ask(message: Message):
+        if not await _require(message):
+            return
+        _pending[(message.peer_id, message.from_id)] = "bcast_dms"
+        await reply(
+            message,
+            "✉️ Рассылка во все ЛС игроков.\n"
+            "Напиши текст объявления одним сообщением (или «отмена»).\n"
+            "Кто закрыл ЛС с ботом — не получит.",
+            keyboard=cancel_keyboard().get_json(),
+        )
+
+    @bot.on.message(func=payload_cmd("adm_bcast_all"))
+    async def adm_bcast_all_ask(message: Message):
+        if not await _require(message):
+            return
+        _pending[(message.peer_id, message.from_id)] = "bcast_all"
+        await reply(
+            message,
+            "📣✉️ Рассылка везде: беседы стран + ЛС.\n"
+            "Напиши текст объявления одним сообщением (или «отмена»).",
+            keyboard=cancel_keyboard().get_json(),
+        )
 
     @bot.on.message(func=payload_cmd("adm_give"))
     async def adm_give_ask(message: Message):
@@ -181,6 +222,18 @@ def register(bot: Bot) -> None:
             name = text.split(maxsplit=1)[1].strip()
             await _do_del_nation(message, name)
             return
+        if lower.startswith("!объявление ") or lower.startswith("!broadcast "):
+            body = text.split(maxsplit=1)[1].strip()
+            await _do_broadcast(message, body, to_chats=True, to_dms=True)
+            return
+        if lower.startswith("!объявление_беседы "):
+            body = text.split(maxsplit=1)[1].strip()
+            await _do_broadcast(message, body, to_chats=True, to_dms=False)
+            return
+        if lower.startswith("!объявление_лс "):
+            body = text.split(maxsplit=1)[1].strip()
+            await _do_broadcast(message, body, to_chats=False, to_dms=True)
+            return
 
         key = (message.peer_id, message.from_id)
         mode = _pending.get(key)
@@ -189,6 +242,16 @@ def register(bot: Bot) -> None:
         if lower in {"отмена", "❌ отмена", "cancel"}:
             _pending.pop(key, None)
             await reply(message, "Отменено.", keyboard=admin_keyboard().get_json())
+            return
+
+        if mode in {"bcast_chats", "bcast_dms", "bcast_all"}:
+            _pending.pop(key, None)
+            await _do_broadcast(
+                message,
+                text,
+                to_chats=mode in {"bcast_chats", "bcast_all"},
+                to_dms=mode in {"bcast_dms", "bcast_all"},
+            )
             return
 
         _pending.pop(key, None)
@@ -206,6 +269,35 @@ def register(bot: Bot) -> None:
                 await _do_del_nation(message, text)
         except (ValueError, IndexError):
             await reply(message, "Неверный формат.", keyboard=admin_keyboard().get_json())
+
+
+async def _do_broadcast(
+    message: Message,
+    text: str,
+    *,
+    to_chats: bool,
+    to_dms: bool,
+) -> None:
+    if not await _require(message):
+        return
+    await reply(
+        message,
+        "⏳ Рассылка идёт… это может занять минуту.",
+        keyboard=admin_keyboard().get_json(),
+    )
+    async with SessionLocal() as session:
+        try:
+            result = await broadcast(
+                message.ctx_api,
+                session,
+                text,
+                to_chats=to_chats,
+                to_dms=to_dms,
+            )
+        except ValueError as e:
+            await reply(message, str(e), keyboard=admin_keyboard().get_json())
+            return
+    await reply(message, format_report(result), keyboard=admin_keyboard().get_json())
 
 
 async def _do_give(message: Message, vk_id: int, amount: int) -> None:
