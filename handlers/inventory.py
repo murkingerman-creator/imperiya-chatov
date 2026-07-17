@@ -74,19 +74,8 @@ def register(bot: Bot) -> None:
         if not it:
             await message.answer("Предмет не найден.")
             return
-        charge = it.get("charge")
-        charge_line = ""
-        if charge:
-            charge_line = (
-                f"\n⚡ Заряд: {charge['code']} "
-                f"(КД {charge.get('cooldown_hours', '?')}ч)"
-            )
-        aura = it.get("aura")
-        aura_line = f"\n🌫 Аура: {aura}" if aura else ""
         await message.answer(
-            f"{cat.format_item(it)}\n"
-            f"Слот: {cat.SLOT_LABEL.get(it['slot'], it['slot'])}\n"
-            f"{it.get('desc', '')}{charge_line}{aura_line}",
+            f"{cat.format_item(it)}\n{cat.format_buffs(it)}",
             keyboard=item_actions_keyboard(item_id, it["rarity"]).get_json(),
         )
 

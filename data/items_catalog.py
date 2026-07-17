@@ -335,3 +335,80 @@ def format_item(it: dict) -> str:
     mark = RARITY_MARK.get(it["rarity"], "⬜")
     label = RARITY_LABEL.get(it["rarity"], it["rarity"])
     return f"{mark} [{label}] {it['name']}"
+
+
+def format_buffs(it: dict) -> str:
+    """Человекочитаемые баффы / заряд / аура для карточки и торга."""
+    lines: list[str] = []
+    if it.get("desc"):
+        lines.append(it["desc"])
+    p = it.get("passives") or {}
+    job_names = {"mine": "шахта", "market": "рынок", "guard": "охрана"}
+    if p.get("work_mult"):
+        lines.append(f"• Все работы: {p['work_mult']:+.0%}")
+    for job, bonus in (p.get("job_bonus") or {}).items():
+        lines.append(f"• {job_names.get(job, job)}: {bonus:+.0%}")
+    if p.get("raid_mult"):
+        lines.append(f"• Рейд: {p['raid_mult']:+.0%}")
+    if p.get("raid_defend"):
+        lines.append(f"• Защита казны: {p['raid_defend']:+.0%}")
+    if p.get("raid_cd_hours"):
+        lines.append(f"• КД рейда: {p['raid_cd_hours']:+.2f}ч")
+    if p.get("raid_leader_share"):
+        lines.append(f"• Доля лидера: {p['raid_leader_share']:+.0%}")
+    if p.get("tax_add"):
+        lines.append(f"• Налог с работ: {p['tax_add']:+.0%}")
+    if p.get("smuggle_chance"):
+        lines.append(f"• Шанс контрабанды: {p['smuggle_chance']:+.0%}")
+    if p.get("smuggle_reward"):
+        lines.append(f"• Награда контрабанды: {p['smuggle_reward']:+.0%}")
+    if p.get("smuggle_fine_mult") and p["smuggle_fine_mult"] != 1:
+        lines.append(f"• Штраф контрабанды ×{p['smuggle_fine_mult']}")
+    if p.get("jail_hours_mult") and p["jail_hours_mult"] != 1:
+        lines.append(f"• Тюрьма ×{p['jail_hours_mult']}")
+    if p.get("treasury_bonus_add"):
+        lines.append(f"• В казну с охраны: +{p['treasury_bonus_add']}")
+    if p.get("loot_luck"):
+        lines.append(f"• Удача лута: {p['loot_luck']:+.0%}")
+    charge = it.get("charge")
+    if charge:
+        lines.append(
+            f"⚡ Заряд `{charge['code']}` · КД {charge.get('cooldown_hours', '?')}ч"
+        )
+    aura = it.get("aura") or {}
+    if aura.get("nation_work_mult"):
+        lines.append(f"🌫 Аура страны (работы): {aura['nation_work_mult']:+.0%}")
+    if aura.get("nation_treasury_raid_defend"):
+        lines.append(
+            f"🌫 Аура защиты казны: {aura['nation_treasury_raid_defend']:+.0%}"
+        )
+    if aura.get("personal_gold_vein"):
+        lines.append("🌫 Для тебя всегда «золотая жила»")
+    if aura.get("raid_target_mark"):
+        lines.append("🌫 Страна помечена как богатая добыча")
+    slot = SLOT_LABEL.get(it.get("slot", ""), it.get("slot", ""))
+    if slot:
+        lines.append(f"Слот: {slot}")
+    # unique lines, keep order
+    seen = set()
+    out = []
+    for line in lines:
+        if line not in seen:
+            seen.add(line)
+            out.append(line)
+    return "\n".join(out) if out else "Без особых бонусов"
+
+
+def search_catalog(query: str, *, rarity: str | None = None, limit: int = 20) -> list[dict]:
+    q = (query or "").strip().casefold()
+    out = []
+    for it in ITEMS.values():
+        if rarity and it["rarity"] != rarity:
+            continue
+        if q and q not in it["name"].casefold() and q not in it["id"].casefold():
+            if q not in (it.get("desc") or "").casefold():
+                continue
+        out.append(it)
+        if len(out) >= limit:
+            break
+    return out

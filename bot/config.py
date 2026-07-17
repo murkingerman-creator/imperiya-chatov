@@ -207,6 +207,13 @@ WORK_MULT_CAP = 0.35
 RAID_MULT_CAP = 0.25
 MERGE_COMMON_COUNT = 3
 
+# Player marketplace
+MARKET_FEE = 0.05  # 5% с продавца
+MARKET_MIN_PRICE = 10
+MARKET_MAX_PRICE = 50000
+MARKET_MAX_LISTINGS = 10
+MARKET_HOURS = 72
+
 
 def require_config() -> None:
     if not VK_TOKEN or VK_TOKEN.startswith("vk1.a.your_group_token"):

@@ -210,3 +210,20 @@ class PlayerBuff(Base):
     stacks: Mapped[int] = mapped_column(Integer, default=0)
     meta: Mapped[str] = mapped_column(String(128), default="")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MarketListing(Base):
+    """P2P-лоты торговой площадки."""
+
+    __tablename__ = "market_listings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    seller_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    item_id: Mapped[str] = mapped_column(String(64), index=True)
+    rarity: Mapped[str] = mapped_column(String(16), index=True, default="common")
+    price: Mapped[int] = mapped_column(Integer)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -5,6 +5,7 @@ from handlers import (
     fun,
     inventory,
     invite,
+    market,
     nation,
     profile,
     start,
@@ -26,4 +27,5 @@ def register_all(bot) -> None:
     customize.register(bot)
     fun.register(bot)
     inventory.register(bot)
+    market.register(bot)
     nation.register(bot)

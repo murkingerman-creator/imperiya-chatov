@@ -33,12 +33,14 @@ def more_keyboard() -> Keyboard:
     kb.add(Text("📦 Квест", {"cmd": "quest"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text("🏷 Аукцион", {"cmd": "auction"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🛒 Торг", {"cmd": "market"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text("🗳 Выборы", {"cmd": "election"}), color=KeyboardButtonColor.PRIMARY)
-    kb.row()
     kb.add(Text("⚔ Война бесед", {"cmd": "chatwar"}), color=KeyboardButtonColor.NEGATIVE)
-    kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
+    kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -306,6 +308,8 @@ def bag_keyboard(page: int = 0, has_next: bool = False) -> Keyboard:
         kb.add(Text("➡", {"cmd": "bag", "page": page + 1}))
     kb.row()
     kb.add(Text("⚡ Заряды", {"cmd": "bag_charges"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🛒 Торг", {"cmd": "market_menu"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -328,6 +332,8 @@ def bag_items_keyboard(items: list[tuple], page: int, has_next: bool = False) ->
     kb.add(Text("📖 Кодекс", {"cmd": "codex"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text("⚡ Заряды", {"cmd": "bag_charges"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🛒 Торг", {"cmd": "market_menu"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -335,12 +341,108 @@ def bag_items_keyboard(items: list[tuple], page: int, has_next: bool = False) ->
 def item_actions_keyboard(item_id: str, rarity: str) -> Keyboard:
     kb = Keyboard(one_time=True, inline=False)
     kb.add(Text("✅ Экип", {"cmd": "bag_equip", "id": item_id}), color=KeyboardButtonColor.POSITIVE)
-    kb.add(Text("💰 Продать", {"cmd": "bag_sell", "id": item_id}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🛒 На торг", {"cmd": "mkt_sell_menu", "id": item_id}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
+    kb.add(Text("💰 Продать боту", {"cmd": "bag_sell", "id": item_id}), color=KeyboardButtonColor.PRIMARY)
     if rarity == "common":
         kb.add(Text("🔀 Слить×3", {"cmd": "bag_merge", "id": item_id}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
     if rarity in ("epic", "legendary", "mythic"):
         kb.add(Text("🏛 В казну", {"cmd": "bag_donate", "id": item_id}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def market_menu_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("🛒 Витрина", {"cmd": "market", "page": 0}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🔎 Поиск", {"cmd": "mkt_help"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("⬜ Обычн.", {"cmd": "market", "rarity": "common", "page": 0}))
+    kb.add(Text("🟩 Необыч.", {"cmd": "market", "rarity": "uncommon", "page": 0}))
+    kb.add(Text("🟦 Редк.", {"cmd": "market", "rarity": "rare", "page": 0}))
+    kb.row()
+    kb.add(Text("🟪 Эпик", {"cmd": "market", "rarity": "epic", "page": 0}))
+    kb.add(Text("🟨 Легенд.", {"cmd": "market", "rarity": "legendary", "page": 0}))
+    kb.add(Text("🟥 Миф", {"cmd": "market", "rarity": "mythic", "page": 0}))
+    kb.row()
+    kb.add(Text("📦 Мои лоты", {"cmd": "mkt_mine"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def market_listings_keyboard(
+    listings: list,
+    *,
+    page: int = 0,
+    rarity: str | None = None,
+    query: str | None = None,
+    has_next: bool = False,
+    mine: bool = False,
+) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    for i, listing in enumerate(listings[:6]):
+        if i and i % 2 == 0:
+            kb.row()
+        from data import items_catalog as cat
+
+        it = cat.get_item(listing.item_id)
+        name = (it["name"] if it else listing.item_id)[:12]
+        kb.add(
+            Text(
+                f"#{listing.id} {name} {listing.price}",
+                {"cmd": "mkt_view", "id": listing.id},
+            ),
+            color=KeyboardButtonColor.PRIMARY,
+        )
+    kb.row()
+    nav_payload = {"cmd": "market", "page": page}
+    if rarity:
+        nav_payload["rarity"] = rarity
+    if query:
+        nav_payload["q"] = query
+    if mine:
+        nav_payload = {"cmd": "mkt_mine", "page": page}
+    if page > 0:
+        prev = dict(nav_payload)
+        prev["page"] = page - 1
+        kb.add(Text("⬅", prev))
+    if has_next:
+        nxt = dict(nav_payload)
+        nxt["page"] = page + 1
+        kb.add(Text("➡", nxt))
+    kb.row()
+    kb.add(Text("🛒 Торг", {"cmd": "market_menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def market_listing_actions_keyboard(listing_id: int, *, is_owner: bool) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    if is_owner:
+        kb.add(
+            Text("❌ Снять лот", {"cmd": "mkt_cancel", "id": listing_id}),
+            color=KeyboardButtonColor.NEGATIVE,
+        )
+    else:
+        kb.add(
+            Text("✅ Купить", {"cmd": "mkt_buy", "id": listing_id}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+    kb.row()
+    kb.add(Text("🛒 Торг", {"cmd": "market_menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def market_price_keyboard(item_id: str) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    prices = (50, 100, 200, 500, 1000, 2500, 5000, 10000)
+    for i, price in enumerate(prices):
+        if i and i % 4 == 0:
+            kb.row()
+        kb.add(
+            Text(str(price), {"cmd": "mkt_list", "id": item_id, "price": price}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
     kb.row()
     kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.SECONDARY)
     return kb
