@@ -3,6 +3,7 @@ from handlers import (
     customize,
     daily,
     fun,
+    guide,
     inventory,
     invite,
     market,
@@ -17,6 +18,7 @@ from handlers import (
 
 def register_all(bot) -> None:
     start.register(bot)
+    guide.register(bot)
     admin.register(bot)
     profile.register(bot)
     daily.register(bot)

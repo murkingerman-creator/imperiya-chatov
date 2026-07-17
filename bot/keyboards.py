@@ -20,7 +20,9 @@ def main_keyboard(*, is_admin: bool = False) -> Keyboard:
     kb.add(Text("🏆 Топ", {"cmd": "top_nations"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
+    kb.add(Text("📖 Как играть", {"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("🎯 Ещё", {"cmd": "more"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     if is_admin:
         kb.add(Text("🛠 Админ", {"cmd": "admin"}), color=KeyboardButtonColor.PRIMARY)
@@ -39,8 +41,9 @@ def more_keyboard() -> Keyboard:
     kb.add(Text("⚔ Война бесед", {"cmd": "chatwar"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
     kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📖 Как играть", {"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
