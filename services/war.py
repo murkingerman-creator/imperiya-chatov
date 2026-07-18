@@ -19,6 +19,8 @@ from services.season import add_points
 from services.weeklies import add_progress
 from services.flash_events import get_flash_event
 from services.alliances import are_allied, get_active_ally
+from services.districts import barracks_raid_bonus
+from services.muster import active_muster_bonus, consume_muster_after_raid
 from services.world_events import (
     get_active_event,
     loot_multiplier,
@@ -204,7 +206,16 @@ async def raid(
             f"+{int(config.ALLIANCE_FORCE_SHARE * 100)}% силы союзника"
         )
 
-    atk_mult = float(getattr(loadout, "raid_mult", 0.0) or 0.0)
+    muster_n, muster_bonus = await active_muster_bonus(session, attacker)
+    if muster_bonus:
+        effective_atk += muster_bonus
+        charge_notes.append(f"📣 Сбор: {muster_n} в строю (+сила)")
+
+    barracks = barracks_raid_bonus(attacker)
+    if barracks:
+        charge_notes.append(f"⚔ Казарма: +{int(barracks * 100)}% к атаке")
+
+    atk_mult = float(getattr(loadout, "raid_mult", 0.0) or 0.0) + barracks
     defend_stat = 0.0
     if def_loadout:
         defend_stat = (
@@ -249,6 +260,7 @@ async def raid(
     # КД всегда сгорает — попытка рейда
     attacker.last_raid_at = now
     await add_progress(session, attacker.id, "raid_attempts", 1)
+    muster_used = await consume_muster_after_raid(session, attacker)
 
     rolled = random.random()
     if rolled > chance:
@@ -269,6 +281,7 @@ async def raid(
             "chance": chance,
             "roll": rolled,
             "charge_notes": charge_notes,
+            "muster": muster_used,
         }
 
     # --- победа: доля от казны зависит от перевеса, не чистый рандом ---
@@ -366,6 +379,7 @@ async def raid(
         "drop": drop,
         "charge_notes": charge_notes,
         "reflected": reflected,
+        "muster": muster_used,
         "atk_citizens": atk_manpower["effective"],
         "def_citizens": def_manpower["effective"],
         "atk_manpower": atk_manpower,
@@ -408,7 +422,11 @@ async def preview_raid_odds(
         effective += float(ally_manpower["effective"]) * float(
             config.ALLIANCE_FORCE_SHARE
         )
-    attack = attack_force(effective, loadout.raid_mult)
+    muster_n, muster_bonus = await active_muster_bonus(session, attacker_nation)
+    if muster_bonus:
+        effective += muster_bonus
+    raid_gear = float(loadout.raid_mult or 0.0) + barracks_raid_bonus(attacker_nation)
+    attack = attack_force(effective, raid_gear)
     defense = defense_force(defender_manpower["effective"], defend)
     chance = win_chance(attack, defense)
     shield_until = ensure_aware(defender_nation.shield_until)
@@ -425,6 +443,7 @@ async def preview_raid_odds(
         "defender_manpower": defender_manpower,
         "ally": ally,
         "ally_manpower": ally_manpower,
+        "muster": muster_n,
         "shielded": bool(shield_until and shield_until > utcnow()),
     }
 

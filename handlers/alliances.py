@@ -163,16 +163,29 @@ def register(bot: Bot) -> None:
                 await reply(message, e.message)
                 return
             my, ally = r["nation"], r["ally"]
+            penalty = int(r.get("penalty") or 0)
+            ally_gain = int(r.get("ally_gain") or 0)
             await add_event(
                 session,
                 "alliance",
-                f"💔 Союз разорван: {my.flag_emoji} {my.name} / {ally.flag_emoji} {ally.name}",
-                f"{my.id},{ally.id}",
+                f"💔 Предательство: {my.flag_emoji} {my.name} разорвали союз "
+                f"с {ally.flag_emoji + ' ' + ally.name if ally else '?'}"
+                + (f" (−{penalty} казны)" if penalty else ""),
+                f"{my.id},{ally.id if ally else 0}",
             )
-            msg = (
-                f"💔 Союз разорван.\n"
-                f"{my.flag_emoji} {my.name} больше не с {ally.flag_emoji} {ally.name}."
-            )
+            if ally:
+                msg = (
+                    f"💔 Союз разорван — предательство!\n"
+                    f"{my.flag_emoji} {my.name} больше не с "
+                    f"{ally.flag_emoji} {ally.name}."
+                )
+            else:
+                msg = "💔 Союз разорван."
+            if penalty:
+                msg += f"\nШтраф с казны: −{penalty}"
+                if ally_gain:
+                    msg += f" · союзнику +{ally_gain}"
+                msg += f"\nКД нового союза: {r.get('cd_hours', 12)}ч."
             await reply(
                 message, msg, keyboard=alliance_keyboard(is_leader=True).get_json()
             )

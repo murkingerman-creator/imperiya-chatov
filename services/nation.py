@@ -42,6 +42,9 @@ def format_nation_card(
         lines.append(f"Приветствие: {nation.welcome}")
     tax_pct = int(round((nation.tax_rate or 0.1) * 100))
     lines.append(f"💰 Казна: {nation.treasury} · Налог: {tax_pct}% · 👥 {citizens}")
+    from services.districts import districts_card_line
+
+    lines.append(districts_card_line(nation))
     if ally_line:
         lines.append(ally_line)
     return "\n".join(lines)

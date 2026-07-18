@@ -6,6 +6,7 @@ from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd
 from services.achievements import format_titles
+from services.empire import format_empire_line, get_empire_status
 from services.inventory import discovered_count, get_equipped
 from services.player import (
     energy_next_in_minutes,
@@ -17,6 +18,13 @@ from services.player import (
 from services.flash_events import format_flash_event, get_flash_event
 from services.world_events import format_event, get_active_event
 from content import items_catalog as cat
+
+
+def _bar(label: str, cur: int, goal: int) -> str:
+    cur = max(0, int(cur))
+    goal = max(1, int(goal))
+    filled = min(10, int(round(10 * min(cur, goal) / goal)))
+    return f"{label}: [{'█' * filled}{'░' * (10 - filled)}] {min(cur, goal)}/{goal}"
 
 
 def register(bot: Bot) -> None:
@@ -31,6 +39,7 @@ def register(bot: Bot) -> None:
             flash = await get_flash_event(session)
             equipped = await get_equipped(session, player.vk_id)
             codex_n = await discovered_count(session, player.vk_id)
+            empire = await get_empire_status(session)
 
             nation_line = "не в стране"
             if player.nation:
@@ -63,17 +72,30 @@ def register(bot: Bot) -> None:
                 else "пусто"
             )
 
+            progress = "\n".join(
+                [
+                    _bar("🔥 Стрик", player.daily_streak or 0, 7),
+                    _bar("⚔ Победы рейдов", player.raid_wins or 0, 5),
+                    _bar("📖 Кодекс", codex_n, 30),
+                    _bar("🗺 Квест работ", player.quest_jobs or 0, 10),
+                ]
+            )
+            empire_line = format_empire_line(empire)
+            empire_block = f"\n{empire_line}" if empire_line else ""
+
             text = (
                 f"👤 {player.name}\n"
                 f"💰 Кроны: {player.crowns}\n"
                 f"⚡ Энергия: {player.energy}/{config.MAX_ENERGY} ({energy_hint})\n"
                 f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"
                 f"🏅 Титулы: {format_titles(player)}\n"
+                f"📈 Прогресс:\n{progress}\n"
                 f"🎒 Экип: {eq_line}\n"
                 f"📖 Кодекс: {codex_n}/{cat.catalog_size()}\n"
                 f"📨 Код: {player.invite_code}\n"
                 f"🏛 Страна: {nation_line}"
-                f"{jail_line}\n"
+                f"{jail_line}"
+                f"{empire_block}\n"
                 f"{format_event(ev)}\n"
                 f"{format_flash_event(flash)}"
             )

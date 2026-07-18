@@ -357,12 +357,17 @@ def nation_keyboard(*, in_chat: bool, has_nation: bool, is_leader: bool) -> Keyb
             kb.add(Text("👑 Роли", {"cmd": "roles"}), color=KeyboardButtonColor.PRIMARY)
             kb.add(Text("🤝 Союз", {"cmd": "alliance"}), color=KeyboardButtonColor.POSITIVE)
             kb.row()
+            kb.add(Text("🏙 Районы", {"cmd": "districts"}), color=KeyboardButtonColor.PRIMARY)
             kb.add(Text("⚔ Рейд", {"cmd": "war"}), color=KeyboardButtonColor.NEGATIVE)
+            kb.row()
             kb.add(Text("🗑 Распустить", {"cmd": "dissolve_nation"}), color=KeyboardButtonColor.NEGATIVE)
         else:
             kb.row()
             kb.add(Text("🤝 Союз", {"cmd": "alliance"}), color=KeyboardButtonColor.POSITIVE)
+            kb.add(Text("🏙 Районы", {"cmd": "districts"}), color=KeyboardButtonColor.PRIMARY)
+            kb.row()
             kb.add(Text("⚔ Рейд", {"cmd": "war"}), color=KeyboardButtonColor.NEGATIVE)
+            kb.add(Text("✋ В строй", {"cmd": "muster_join"}), color=KeyboardButtonColor.POSITIVE)
     else:
         if in_chat:
             kb.add(
@@ -507,6 +512,32 @@ def raid_targets_keyboard(names: list[str], *, cmd: str = "raid") -> Keyboard:
         )
     kb.row()
     kb.add(Text("❌ Отмена", {"cmd": "alliance" if cmd != "raid" else "cancel"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def districts_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("🛒 Рынок", {"cmd": "district_up", "d": "market"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("⚔ Казарма", {"cmd": "district_up", "d": "barracks"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("🛕 Храм", {"cmd": "district_up", "d": "temple"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("🏛 Страна", {"cmd": "nation"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def war_actions_keyboard(names: list[str]) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    kb.add(Text("📣 Сбор", {"cmd": "muster_open"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("✋ В строй", {"cmd": "muster_join"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    for i, name in enumerate(names[:6]):
+        if i and i % 2 == 0:
+            kb.row()
+        kb.add(Text(f"⚔ {name}", {"cmd": "raid", "target": name}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("❌ Отмена", {"cmd": "cancel"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 

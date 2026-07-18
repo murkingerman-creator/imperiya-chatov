@@ -4,6 +4,7 @@ from handlers import (
     bugs,
     customize,
     daily,
+    districts,
     fun,
     guide,
     inventory,
@@ -40,6 +41,7 @@ def register_all(bot) -> None:
     bugs.register(bot)
     nation.register(bot)
     nation_extra.register(bot)
+    districts.register(bot)
     alliances.register(bot)
 
     # активность в беседе страны → сила рейда

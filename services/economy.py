@@ -239,6 +239,22 @@ async def finish_minigame(
     if work_buff_until and work_buff_until > utcnow():
         gross = max(1, int(gross * 1.10))
         charge_notes.append("📜 Указ о труде: +10% доход")
+
+    from services.districts import market_work_bonus, temple_luck_bonus
+    from services.empire import get_empire_status
+
+    market_b = market_work_bonus(player.nation if player.nation_id else None)
+    if market_b:
+        gross = max(1, int(gross * (1.0 + market_b)))
+        charge_notes.append(f"🛒 Рынок столицы: +{int(market_b * 100)}%")
+
+    empire = await get_empire_status(session)
+    if empire:
+        gross = max(1, int(gross * (1.0 + float(empire["work_mult"]))))
+        charge_notes.append(
+            f"🏛 Указ Империи: +{int(empire['work_mult'] * 100)}%"
+        )
+
     if free_mine_ok:
         gross *= 2
 
@@ -307,6 +323,10 @@ async def finish_minigame(
 
     drop_pool = spec.get("loot_pool") or game.job
     loot_m = loot_multiplier(ev, flash)
+    luck = float(loadout.loot_luck or 0.0)
+    luck += temple_luck_bonus(player.nation if player.nation_id else None)
+    if empire:
+        luck += float(empire["loot_luck"])
     drop = await grant_drop(
         session,
         player,
@@ -314,7 +334,7 @@ async def finish_minigame(
         success=success,
         job=game.job,
         event_key=event_key,
-        loot_luck=loadout.loot_luck,
+        loot_luck=luck,
         loot_mult=loot_m,
     )
     if game.job == "mine" and "double_loot_mine" in loadout.charges_ready:

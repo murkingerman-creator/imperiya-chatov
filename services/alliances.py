@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import config
 from db.models import Nation, NationAlliance, Player
 from services.nation import find_nations_fuzzy, get_nation_by_id
-from services.player import utcnow
+from services.player import ensure_aware, utcnow
+from datetime import timedelta
 
 
 class AllianceError(Exception):
@@ -83,6 +84,12 @@ async def propose_alliance(
     session: AsyncSession, leader: Player, target_name: str
 ) -> dict:
     my = _require_leader(leader)
+    cd = ensure_aware(my.alliance_cd_until)
+    if cd and cd > utcnow():
+        left = (cd - utcnow()).total_seconds() / 3600
+        raise AllianceError(
+            f"После разрыва союза КД ~{left:.1f} ч. Подожди."
+        )
     matches = await find_nations_fuzzy(session, target_name)
     if not matches:
         raise AllianceError(f"Страна «{target_name}» не найдена.")
@@ -92,6 +99,10 @@ async def propose_alliance(
     target = matches[0]
     if target.id == my.id:
         raise AllianceError("Нельзя заключить союз с собой.")
+
+    tcd = ensure_aware(target.alliance_cd_until)
+    if tcd and tcd > utcnow():
+        raise AllianceError("У этой страны ещё КД после разрыва союза.")
 
     if await get_active_ally(session, my.id):
         raise AllianceError("У тебя уже есть активный союз. Сначала разорви его.")
@@ -198,9 +209,30 @@ async def break_alliance(session: AsyncSession, leader: Player) -> dict:
         row.nation_high_id if row.nation_low_id == my.id else row.nation_low_id
     )
     ally = await get_nation_by_id(session, other_id)
+
+    # предательство: штраф с казны инициатора
+    penalty = int(my.treasury * float(config.ALLIANCE_BREAK_PENALTY_PCT))
+    ally_gain = 0
+    if penalty > 0:
+        my.treasury -= penalty
+        if ally:
+            ally_gain = int(penalty * float(config.ALLIANCE_BREAK_ALLY_SHARE))
+            ally.treasury += ally_gain
+
+    cd_until = utcnow() + timedelta(hours=config.ALLIANCE_REPROPOSE_HOURS)
+    my.alliance_cd_until = cd_until
+    if ally:
+        ally.alliance_cd_until = cd_until
+
     await session.delete(row)
     await session.commit()
-    return {"nation": my, "ally": ally}
+    return {
+        "nation": my,
+        "ally": ally,
+        "penalty": penalty,
+        "ally_gain": ally_gain,
+        "cd_hours": config.ALLIANCE_REPROPOSE_HOURS,
+    }
 
 
 async def alliance_status_text(session: AsyncSession, nation: Nation) -> str:
@@ -211,7 +243,9 @@ async def alliance_status_text(session: AsyncSession, nation: Nation) -> str:
             f"Активный союз: {ally.flag_emoji} {ally.name}\n"
             f"В рейде союзник даёт ~{int(config.ALLIANCE_FORCE_SHARE * 100)}% силы "
             f"и получает {int(config.ALLIANCE_LOOT_SHARE * 100)}% добычи в казну.\n"
-            f"На союзника рейдить нельзя."
+            f"На союзника рейдить нельзя.\n"
+            f"⚠ Разрыв = предательство: −{int(config.ALLIANCE_BREAK_PENALTY_PCT * 100)}% "
+            f"казны + КД {config.ALLIANCE_REPROPOSE_HOURS}ч."
         )
     else:
         lines.append("Активного союза нет.")

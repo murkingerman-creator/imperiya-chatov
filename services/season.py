@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import MetaKV, Nation, Player, SeasonScore
 from services.achievements import grant_title
+from services.empire import start_empire_decree
 from services.player import utcnow
 
 MSK = timezone(timedelta(hours=3))
@@ -61,11 +62,18 @@ async def maybe_rotate_season(session: AsyncSession) -> list[str]:
         .limit(3)
     )
     awards: list[str] = []
-    for rank, (score, nation, leader) in enumerate(result.all(), 1):
+    rows = list(result.all())
+    for rank, (score, nation, leader) in enumerate(rows, 1):
         title = await grant_title(session, leader, "empire_season")
         if title:
             awards.append(
                 f"🏆 {rank}. {nation.flag_emoji} {nation.name} — {title}"
+            )
+        if rank == 1:
+            until = await start_empire_decree(session, nation)
+            awards.append(
+                f"🏛 Указ Империи на 14 дней: +работы и удача лута для всех "
+                f"(до {until.astimezone(MSK).strftime('%d.%m %H:%M')} МСК)"
             )
     meta.value = current
     await session.commit()

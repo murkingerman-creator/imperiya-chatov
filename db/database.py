@@ -51,6 +51,11 @@ _NATION_COLS = {
     "shield_until": "DATETIME",
     "shield_pool": "INTEGER DEFAULT 0",
     "work_buff_until": "DATETIME",
+    "district_market": "INTEGER DEFAULT 0",
+    "district_barracks": "INTEGER DEFAULT 0",
+    "district_temple": "INTEGER DEFAULT 0",
+    "alliance_cd_until": "DATETIME",
+    "muster_until": "DATETIME",
 }
 _EQUIPPED_COLS = {
     "upgrade": "INTEGER DEFAULT 0",

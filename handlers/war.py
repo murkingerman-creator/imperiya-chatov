@@ -2,12 +2,14 @@ import re
 
 from vkbottle.bot import Bot, Message
 
-from bot.keyboards import main_keyboard, raid_targets_keyboard
+from bot import config
+from bot.keyboards import main_keyboard, war_actions_keyboard
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
 from services.chronicle import post_flash
 from services.chronicle_store import add_event
+from services.muster import MusterError, join_muster, open_muster
 from services.notify import notify_nation_chat
 from services.player import get_or_create_player
 from services.roles import can_raid
@@ -104,7 +106,8 @@ def register(bot: Bot) -> None:
             lines = [
                 f"⚔ Рейд от {player.nation.flag_emoji} {player.nation.name}",
                 f"👥 {my['total']} (активны {my['active']} за 48ч)",
-                "Сила от активных граждан + экип. Шанс ~ до атаки.",
+                "📣 Сначала «Сбор» — граждане жмут «В строй» → больше силы.",
+                "Сила: активные + экип + казарма + союз + сбор.",
                 "Цель кнопкой или: рейд Название",
                 "",
             ]
@@ -114,16 +117,54 @@ def register(bot: Bot) -> None:
                 shield = " 🛡" if odds["shielded"] else ""
                 ally = odds.get("ally")
                 ally_mark = f" ·🤝{ally.name}" if ally else ""
+                muster = odds.get("muster") or 0
+                muster_mark = f" ·📣{muster}" if muster else ""
                 lines.append(
                     f"• {t.flag_emoji} {t.name} — казна {t.treasury} · "
                     f"👥{dm['total']}/{dm['active']}акт · "
-                    f"~{int(odds['chance'] * 100)}%{shield}{ally_mark}"
+                    f"~{int(odds['chance'] * 100)}%{shield}{ally_mark}{muster_mark}"
                 )
 
             await reply(
                 message,
                 "\n".join(lines),
-                keyboard=raid_targets_keyboard([t.name for t in targets]).get_json(),
+                keyboard=war_actions_keyboard([t.name for t in targets]).get_json(),
+            )
+
+    @bot.on.message(func=payload_cmd("muster_open"))
+    async def muster_open_handler(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                r = await open_muster(session, player)
+            except MusterError as e:
+                await reply(message, e.message, keyboard=main_keyboard().get_json())
+                return
+            n = r["nation"]
+            msg = (
+                f"📣 Сбор объявлен в {n.flag_emoji} {n.name}!\n"
+                f"Граждане: «В строй» (~{config.MUSTER_DURATION_MINUTES} мин).\n"
+                f"Чем больше в строю — тем сильнее рейд."
+            )
+            await reply(message, msg, keyboard=main_keyboard().get_json())
+            await notify_nation_chat(message.ctx_api, n.chat_peer_id, msg)
+
+    @bot.on.message(func=payload_cmd("muster_join"))
+    async def muster_join_handler(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                r = await join_muster(session, player)
+            except MusterError as e:
+                await reply(message, e.message, keyboard=main_keyboard().get_json())
+                return
+            await reply(
+                message,
+                f"✋ Ты в строю! Сейчас {r['joined']} чел. "
+                f"Ждём рейда от лидера/воеводы.",
+                keyboard=main_keyboard().get_json(),
             )
 
     @bot.on.message(func=payload_cmd("raid"))

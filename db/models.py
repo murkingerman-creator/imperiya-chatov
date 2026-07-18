@@ -32,6 +32,16 @@ class Nation(Base):
     shield_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     shield_pool: Mapped[int] = mapped_column(Integer, default=0)
     work_buff_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # районы столицы 0..3
+    district_market: Mapped[int] = mapped_column(Integer, default=0)
+    district_barracks: Mapped[int] = mapped_column(Integer, default=0)
+    district_temple: Mapped[int] = mapped_column(Integer, default=0)
+    alliance_cd_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    muster_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -325,3 +335,16 @@ class NationAlliance(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RaidMusterJoin(Base):
+    """Граждане, вступившие в сбор перед рейдом."""
+
+    __tablename__ = "raid_muster_joins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(Integer, index=True)
+    vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

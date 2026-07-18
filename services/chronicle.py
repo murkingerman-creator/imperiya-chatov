@@ -9,8 +9,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import config
-from db.models import ChronicleEvent
+from db.models import ChronicleEvent, Nation, WarLog
 from services.chronicle_store import get_meta, set_meta
+from services.empire import format_empire_line, get_empire_status
 from services.flash_events import get_flash_event
 from services.nation import top_nations
 from services.notify import post_wall
@@ -166,13 +167,35 @@ async def build_digest(session: AsyncSession) -> str:
     # знамения (ивент дня + вспышка)
     daily = await get_active_event(session)
     flash = await get_flash_event(session)
-    if daily or flash:
+    empire = await get_empire_status(session)
+    if daily or flash or empire:
         lines.append("🌤 Знамения суток")
         if daily:
             lines.append(f"• {format_event(daily)}")
         if flash:
             # короткая строка без многострочного оформления
             lines.append(f"• {flash['title']}: {flash['desc']}")
+        eline = format_empire_line(empire)
+        if eline:
+            lines.append(f"• {eline}")
+        lines.append("")
+
+    # герой дня — крупнейший рейд за сутки
+    war = await session.execute(
+        select(WarLog, Nation)
+        .join(Nation, Nation.id == WarLog.attacker_nation_id)
+        .where(WarLog.created_at >= cutoff)
+        .order_by(WarLog.amount.desc())
+        .limit(1)
+    )
+    hero_row = war.first()
+    if hero_row:
+        wlog, atk_n = hero_row
+        lines.append("🌟 Герой дня")
+        lines.append(
+            f"• {atk_n.flag_emoji} {atk_n.name} унесли {wlog.amount} крон "
+            f"в самом жирном рейде суток."
+        )
         lines.append("")
 
     # топ стран

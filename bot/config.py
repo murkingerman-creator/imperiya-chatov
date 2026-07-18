@@ -343,6 +343,26 @@ RAID_FORCE_ACTIVE_WEIGHT = 0.65
 ALLIANCE_FORCE_SHARE = 0.55  # доля силы союзника в атаке
 ALLIANCE_LOOT_SHARE = 0.25  # доля добычи в казну союзника
 ALLIANCE_MAX_PENDING = 3  # исходящих/входящих pending на страну
+ALLIANCE_BREAK_PENALTY_PCT = 0.10  # штраф предателю с казны
+ALLIANCE_BREAK_ALLY_SHARE = 0.5  # доля штрафа обиженной стороне
+ALLIANCE_REPROPOSE_HOURS = 12  # КД на новый союз после разрыва
+
+# Столица: районы (0..3)
+DISTRICT_MAX_LEVEL = 3
+DISTRICT_UPGRADE_COSTS = (0, 200, 500, 1200)  # индекс = целевой уровень
+DISTRICT_MARKET_WORK = (0.0, 0.05, 0.10, 0.16)  # +% к работам
+DISTRICT_BARRACKS_RAID = (0.0, 0.04, 0.08, 0.14)  # + к силе рейда
+DISTRICT_TEMPLE_LUCK = (0.0, 0.05, 0.10, 0.18)  # + удача лута
+
+# Сбор на рейд
+MUSTER_DURATION_MINUTES = 45
+MUSTER_FORCE_PER_JOIN = 1.15  # к effective manpower
+MUSTER_MAX_JOINS = 40
+
+# Империя сезона (указ на всех)
+EMPIRE_DECREE_DAYS = 14
+EMPIRE_WORK_MULT = 0.08
+EMPIRE_LOOT_LUCK = 0.10
 
 # Nation announce throttle
 NATION_ANNOUNCE_COOLDOWN_SEC = 8
