@@ -34,6 +34,9 @@ LIST_RE = re.compile(
     re.IGNORECASE,
 )
 
+# from_id -> item_id awaiting custom price
+_pending_price: dict[int, str] = {}
+
 
 def _is_search(message: Message) -> bool:
     return bool(SEARCH_RE.match((message.text or "").strip()))
@@ -203,12 +206,14 @@ def register(bot: Bot) -> None:
         if not it:
             await message.answer("Предмет не найден.")
             return
+        _pending_price[message.from_id] = item_id
         await reply(message, 
             f"🛒 Выставить на торг\n{cat.format_item(it)}\n"
             f"{cat.format_buffs(it)}\n\n"
-            f"Выбери цену или: торг {item_id} <цена>\n"
-            f"({config.MARKET_MIN_PRICE}–{config.MARKET_MAX_PRICE}, "
-            f"комиссия {int(config.MARKET_FEE*100)}%)",
+            f"Выбери цену кнопкой или напиши числом "
+            f"({config.MARKET_MIN_PRICE}–{config.MARKET_MAX_PRICE}).\n"
+            f"Комиссия {int(config.MARKET_FEE*100)}%.\n"
+            f"Или: торг {item_id} <цена> · «отмена»",
             keyboard=market_price_keyboard(item_id).get_json(),
         )
 
@@ -217,6 +222,7 @@ def register(bot: Bot) -> None:
         payload = message.get_payload_json() or {}
         item_id = str(payload.get("id") or "")
         price = int(payload.get("price") or 0)
+        _pending_price.pop(message.from_id, None)
         await _do_list(message, item_id, price)
 
     @bot.on.message(func=_is_list_text)
@@ -230,7 +236,34 @@ def register(bot: Bot) -> None:
             found = cat.search_catalog(item_id, limit=1)
             if found:
                 item_id = found[0]["id"]
+        _pending_price.pop(message.from_id, None)
         await _do_list(message, item_id, int(m.group(2)))
+
+    @bot.on.message(blocking=False)
+    async def market_price_number(message: Message):
+        """Своя цена числом после «На торг»."""
+        if message.from_id not in _pending_price:
+            return
+        if (message.get_payload_json() or {}).get("cmd"):
+            return
+        text = (message.text or "").strip()
+        if not text:
+            return
+        lower = text.casefold()
+        if lower in {"отмена", "❌ отмена", "cancel"}:
+            _pending_price.pop(message.from_id, None)
+            await reply(
+                message,
+                "Отменено.",
+                keyboard=market_menu_keyboard().get_json(),
+            )
+            return
+        if not text.isdigit():
+            return
+        item_id = _pending_price.pop(message.from_id, None)
+        if not item_id:
+            return
+        await _do_list(message, item_id, int(text))
 
 
 async def _browse(

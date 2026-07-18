@@ -663,6 +663,7 @@ def market_price_keyboard(item_id: str) -> Keyboard:
             color=KeyboardButtonColor.POSITIVE,
         )
     kb.row()
+    kb.add(Text("❌ Отмена", {"cmd": "market_menu"}), color=KeyboardButtonColor.NEGATIVE)
     kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
