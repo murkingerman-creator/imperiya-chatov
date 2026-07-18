@@ -68,6 +68,26 @@ async def give_crowns(session: AsyncSession, vk_id: int, amount: int) -> Player:
     return p
 
 
+async def give_crowns_all(session: AsyncSession, amount: int) -> dict:
+    """Начислить кроны всем игрокам в БД (бонус за обновление)."""
+    if amount == 0:
+        raise AdminError("Сумма не может быть 0.")
+    if abs(amount) > 50_000:
+        raise AdminError("Слишком большая сумма (макс ±50000 за раз).")
+    count = int(
+        (await session.execute(select(func.count()).select_from(Player))).scalar_one()
+    )
+    if count == 0:
+        raise AdminError("В БД нет игроков.")
+    from sqlalchemy import update
+
+    await session.execute(
+        update(Player).values(crowns=Player.crowns + amount)
+    )
+    await session.commit()
+    return {"count": count, "amount": amount, "total": count * amount}
+
+
 async def fill_energy(session: AsyncSession, vk_id: int) -> Player:
     from bot import config
 

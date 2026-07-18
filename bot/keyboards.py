@@ -227,7 +227,9 @@ def admin_keyboard() -> Keyboard:
     kb.row()
     kb.add(Text("📣✉️ Везде", {"cmd": "adm_bcast_all"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
+    kb.add(Text("🎁 Всем кроны", {"cmd": "adm_give_all"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("💡 Предложения", {"cmd": "adm_suggestions"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 

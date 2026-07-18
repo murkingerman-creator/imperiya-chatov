@@ -61,7 +61,8 @@ def register(bot: Bot) -> None:
             "• !объявление_беседы текст\n"
             "• !объявление_лс текст\n"
             "• !принять ID — принять предложение\n"
-            "• !отклонить ID [причина]\n",
+            "• !отклонить ID [причина]\n"
+            "• !всем СУММА — кроны всем за обновление\n",
             keyboard=admin_keyboard().get_json(),
         )
 
@@ -152,6 +153,20 @@ def register(bot: Bot) -> None:
                 format_suggestions_list(items),
                 keyboard=admin_keyboard().get_json(),
             )
+
+    @bot.on.message(func=payload_cmd("adm_give_all"))
+    async def adm_give_all_ask(message: Message):
+        if not await _require(message):
+            return
+        _pending[(message.peer_id, message.from_id)] = "give_all"
+        await reply(
+            message,
+            "🎁 Бонус всем за обновление\n"
+            "Напиши сумму крон (число).\n"
+            "Пример: 100\n"
+            "Или «отмена».",
+            keyboard=cancel_keyboard().get_json(),
+        )
 
     @bot.on.message(func=payload_cmd("adm_give"))
     async def adm_give_ask(message: Message):
@@ -279,6 +294,28 @@ def register(bot: Bot) -> None:
                     keyboard=admin_keyboard().get_json(),
                 )
             return
+        if lower.startswith("!всем ") or lower.startswith("!giveall "):
+            parts = text.split()
+            if len(parts) >= 2:
+                try:
+                    amount = int(parts[1])
+                except ValueError:
+                    amount = None
+                if amount is not None:
+                    await _do_give_all(message, amount)
+                else:
+                    await reply(
+                        message,
+                        "Формат: !всем СУММА",
+                        keyboard=admin_keyboard().get_json(),
+                    )
+            else:
+                await reply(
+                    message,
+                    "Формат: !всем СУММА",
+                    keyboard=admin_keyboard().get_json(),
+                )
+            return
 
         key = (message.peer_id, message.from_id)
         mode = _pending.get(key)
@@ -304,6 +341,8 @@ def register(bot: Bot) -> None:
             if mode == "give":
                 parts = text.split()
                 await _do_give(message, int(parts[0]), int(parts[1]))
+            elif mode == "give_all":
+                await _do_give_all(message, int(text.split()[0]))
             elif mode == "energy":
                 await _do_energy(message, int(text.split()[0]))
             elif mode == "cd":
@@ -356,6 +395,24 @@ async def _do_give(message: Message, vk_id: int, amount: int) -> None:
             f"✅ {p.name} ({vk_id}): {amount:+d} крон → {p.crowns}",
             keyboard=admin_keyboard().get_json(),
         )
+
+
+async def _do_give_all(message: Message, amount: int) -> None:
+    if not await _require(message):
+        return
+    async with SessionLocal() as session:
+        try:
+            result = await admin_svc.give_crowns_all(session, amount)
+        except AdminError as e:
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
+            return
+    await reply(
+        message,
+        f"🎁 Всем начислено {amount:+d} крон\n"
+        f"Игроков: {result['count']}\n"
+        f"Всего выдано: {result['total']:+d}",
+        keyboard=admin_keyboard().get_json(),
+    )
 
 
 async def _do_energy(message: Message, vk_id: int) -> None:
