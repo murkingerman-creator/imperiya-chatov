@@ -86,7 +86,7 @@ def register(bot: Bot) -> None:
                     r = await payout(session, player)
                     text = (
                         f"💰 Раздача (−{r['cost']}): "
-                        f"+{r['each']} ×{r['count']} гражданам."
+                        f"+{r['share']} ×{r['citizens']} гражданам."
                     )
                 elif action == "amnesty":
                     r = await amnesty(session, player)
