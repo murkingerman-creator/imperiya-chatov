@@ -249,7 +249,7 @@ def register(bot: Bot) -> None:
             f"🎲 {name} вызывает на дуэль!\n"
             f"Режим: {mode_label} · ставка {bet}\n"
             f"Кто готов — жми «Принять» (код {duel.token}).",
-            keyboard=duel_accept_keyboard(duel.token).get_json(),
+            keyboard=duel_accept_keyboard(duel.token),
         )
 
     @bot.on.message(func=payload_cmd("duel_accept"))
@@ -286,7 +286,7 @@ def register(bot: Bot) -> None:
         await reply_here(
             message,
             f"✅ {name} принял дуэль vs {duel.challenger_name}!\n{prompt}",
-            keyboard=kb.get_json(),
+            keyboard=kb,
         )
 
     @bot.on.message(func=payload_cmd("duel_move"))

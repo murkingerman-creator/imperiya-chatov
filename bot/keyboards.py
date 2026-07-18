@@ -1,6 +1,14 @@
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot import config
+import json
+
+
+def _inline_json(kb: Keyboard) -> str:
+    """VK запрещает поле one_time у inline-клавиатур."""
+    data = json.loads(kb.get_json())
+    data.pop("one_time", None)
+    return json.dumps(data, ensure_ascii=False)
 
 
 def main_keyboard(*, is_admin: bool = False) -> Keyboard:
@@ -137,30 +145,30 @@ def duel_menu_keyboard() -> Keyboard:
     return kb
 
 
-def duel_accept_keyboard(token: str) -> Keyboard:
+def duel_accept_keyboard(token: str) -> str:
     # inline — в беседе не подменяет общую reply-клавиатуру
-    kb = Keyboard(one_time=True, inline=True)
+    kb = Keyboard(one_time=False, inline=True)
     kb.add(
         Text("✅ Принять дуэль", {"cmd": "duel_accept", "token": token}),
         color=KeyboardButtonColor.POSITIVE,
     )
-    return kb
+    return _inline_json(kb)
 
 
-def rps_keyboard(token: str) -> Keyboard:
-    kb = Keyboard(one_time=True, inline=True)
+def rps_keyboard(token: str) -> str:
+    kb = Keyboard(one_time=False, inline=True)
     for label, move in [("✊ Камень", "rock"), ("✋ Бумага", "paper"), ("✌ Ножницы", "scissors")]:
         kb.add(Text(label, {"cmd": "duel_move", "token": token, "move": move}))
-    return kb
+    return _inline_json(kb)
 
 
-def number_keyboard(token: str) -> Keyboard:
-    kb = Keyboard(one_time=True, inline=True)
+def number_keyboard(token: str) -> str:
+    kb = Keyboard(one_time=False, inline=True)
     for n in range(1, 6):
         kb.add(Text(str(n), {"cmd": "duel_move", "token": token, "move": str(n)}))
         if n == 3:
             kb.row()
-    return kb
+    return _inline_json(kb)
 
 
 def auction_keyboard(auctions: list) -> Keyboard:
