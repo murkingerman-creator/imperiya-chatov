@@ -47,6 +47,12 @@ def roll_drop(
     elif event_key == "plague":
         chance *= 0.7
 
+    # admin / world loot_mult (via event dict key when passed as event_key matching WORLD_EVENTS)
+    from bot import config as _cfg
+
+    if event_key and event_key in _cfg.WORLD_EVENTS:
+        chance *= float(_cfg.WORLD_EVENTS[event_key].get("loot_mult") or 1.0)
+
     chance = min(0.55, chance + loot_luck)
 
     if not force and rng.random() > chance:

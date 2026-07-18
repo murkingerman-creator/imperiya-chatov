@@ -236,7 +236,78 @@ WORLD_EVENTS = {
         "raid_cd_mult": 0.0,  # special: use RAID_NIGHT minutes
         "raid_night": True,
     },
+    "harvest": {
+        "title": "🌾 Урожай",
+        "desc": "Доход с работ ×2!",
+        "work_mult": 2.0,
+        "tax_add": 0.0,
+        "raid_mult": 1.0,
+        "raid_cd_mult": 1.0,
+    },
+    "blood_moon": {
+        "title": "🩸 Кровавая луна",
+        "desc": "Рейды ×1.5, работы −20%",
+        "work_mult": 0.8,
+        "tax_add": 0.0,
+        "raid_mult": 1.5,
+        "raid_cd_mult": 0.85,
+    },
+    "peace": {
+        "title": "🕊 Мирный договор",
+        "desc": "Рейды запрещены",
+        "work_mult": 1.1,
+        "tax_add": -0.02,
+        "raid_mult": 1.0,
+        "raid_cd_mult": 1.0,
+        "raid_block": True,
+    },
+    "tax_free": {
+        "title": "🏛 Налоговые каникулы",
+        "desc": "Налог стран = 0",
+        "work_mult": 1.0,
+        "tax_add": -1.0,
+        "raid_mult": 1.0,
+        "raid_cd_mult": 1.0,
+    },
+    "loot_rain": {
+        "title": "💎 Дождь артефактов",
+        "desc": "Шанс лута ×2",
+        "work_mult": 1.0,
+        "tax_add": 0.0,
+        "raid_mult": 1.0,
+        "raid_cd_mult": 1.0,
+        "loot_mult": 2.0,
+    },
+    "shadow_market": {
+        "title": "🕶 Теневой рынок",
+        "desc": "Контрабанда: шанс и награда выше",
+        "work_mult": 1.0,
+        "tax_add": 0.0,
+        "raid_mult": 0.9,
+        "raid_cd_mult": 1.0,
+        "smuggle_mult": 1.35,
+    },
+    "famine": {
+        "title": "🥀 Голод",
+        "desc": "Доход с работ −50%",
+        "work_mult": 0.5,
+        "tax_add": 0.03,
+        "raid_mult": 1.1,
+        "raid_cd_mult": 1.0,
+    },
+    "merchant": {
+        "title": "🛒 День купца",
+        "desc": "Работы +25%, рейды −15%",
+        "work_mult": 1.25,
+        "tax_add": 0.0,
+        "raid_mult": 0.85,
+        "raid_cd_mult": 1.1,
+    },
 }
+
+# Admin-forced world event duration
+ADMIN_EVENT_DEFAULT_HOURS = 6
+ADMIN_EVENT_MAX_HOURS = 48
 
 TITLE_LABELS = {
     "first_raid": "⚔ Первый рейд",

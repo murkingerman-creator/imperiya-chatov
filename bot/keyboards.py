@@ -214,23 +214,82 @@ def admin_keyboard() -> Keyboard:
     kb.add(Text("💰 Дать кроны", {"cmd": "adm_give"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("⚡ Энергия", {"cmd": "adm_energy"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
-    kb.add(Text("⏱ Сброс КД себе", {"cmd": "adm_cd_self"}), color=KeyboardButtonColor.PRIMARY)
-    kb.add(Text("⏱ Сброс КД игроку", {"cmd": "adm_cd"}), color=KeyboardButtonColor.PRIMARY)
-    kb.row()
     kb.add(Text("🔎 Игрок", {"cmd": "adm_player"}), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text("🗑 Удалить страну", {"cmd": "adm_del_nation"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("⏱ Сброс КД", {"cmd": "adm_cd"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text("📜 Пост хроники", {"cmd": "adm_chronicle"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("📣✉️ Везде", {"cmd": "adm_bcast_all"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🎁 Всем кроны", {"cmd": "adm_give_all"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("🌤 Ивенты", {"cmd": "adm_events"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🎮 Ещё", {"cmd": "adm_extra"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("💡 Предложения", {"cmd": "adm_suggestions"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def admin_events_keyboard() -> Keyboard:
+    """Запуск мировых ивентов. Payload: adm_ev + key."""
+    kb = Keyboard(one_time=False, inline=False)
+    # row pairs of event launch buttons (short labels)
+    buttons = [
+        ("🕷 Чума", "plague"),
+        ("🎪 Ярмарка", "fair"),
+        ("🔥 Восстание", "revolt"),
+        ("✨ Жила", "gold_vein"),
+        ("🌙 Ночь рейдов", "raid_night"),
+        ("🌾 Урожай", "harvest"),
+        ("🩸 Кровавая луна", "blood_moon"),
+        ("🕊 Мир", "peace"),
+        ("🏛 Без налога", "tax_free"),
+        ("💎 Дождь лута", "loot_rain"),
+        ("🕶 Теневой рынок", "shadow_market"),
+        ("🥀 Голод", "famine"),
+        ("🛒 Купец", "merchant"),
+    ]
+    for i, (label, key) in enumerate(buttons):
+        if i and i % 2 == 0:
+            kb.row()
+        kb.add(
+            Text(label, {"cmd": "adm_ev", "key": key}),
+            color=KeyboardButtonColor.PRIMARY,
+        )
+    kb.row()
+    kb.add(Text("📡 Текущий", {"cmd": "adm_ev_status"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("⏹ Стоп", {"cmd": "adm_ev_stop"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("« Назад", {"cmd": "admin"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def admin_extra_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("⛓ Тюрьма", {"cmd": "adm_jail"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("🔓 Свобода", {"cmd": "adm_unjail"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("💸 Забрать кроны", {"cmd": "adm_take"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("👢 Кик из страны", {"cmd": "adm_kick"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("📦 Предмет", {"cmd": "adm_item"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🏷 Титул", {"cmd": "adm_title"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("⚡ Энергия всем", {"cmd": "adm_energy_all"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("⏱ КД всем", {"cmd": "adm_cd_all"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("💰 Топ богачей", {"cmd": "adm_top_rich"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🔎 Поиск имени", {"cmd": "adm_find"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("🎰 Джекпот", {"cmd": "adm_jackpot"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🌧 Дождь стране", {"cmd": "adm_rain"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text("📣 В беседы", {"cmd": "adm_bcast_chats"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("✉️ В ЛС", {"cmd": "adm_bcast_dms"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text("📣✉️ Везде", {"cmd": "adm_bcast_all"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("📜 Хроника", {"cmd": "adm_chronicle"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🗑 Удалить страну", {"cmd": "adm_del_nation"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
-    kb.add(Text("🎁 Всем кроны", {"cmd": "adm_give_all"}), color=KeyboardButtonColor.POSITIVE)
-    kb.add(Text("💡 Предложения", {"cmd": "adm_suggestions"}), color=KeyboardButtonColor.PRIMARY)
-    kb.row()
-    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("⏱ КД себе", {"cmd": "adm_cd_self"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("« Назад", {"cmd": "admin"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 

@@ -17,7 +17,7 @@ from services.player import ensure_aware, utcnow
 from services.roles import can_raid
 from services.season import add_points
 from services.weeklies import add_progress
-from services.world_events import get_active_event, raid_cooldown, raid_multiplier
+from services.world_events import get_active_event, raid_blocked, raid_cooldown, raid_multiplier
 
 
 class WarError(Exception):
@@ -113,6 +113,10 @@ async def raid(
 
     now = utcnow()
     ev = await get_active_event(session)
+    if raid_blocked(ev):
+        raise WarError(
+            "🕊 Действует мирный договор — рейды временно запрещены."
+        )
     loadout = await get_loadout(session, leader)
     charge_notes: list[str] = []
 

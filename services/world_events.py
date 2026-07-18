@@ -45,6 +45,17 @@ async def ensure_daily_event(session: AsyncSession) -> dict:
     if last_day == today and active:
         return active
 
+    # Админский форс с пометкой forced не перебиваем суточной ротацией,
+    # пока ивент ещё активен.
+    raw = await get_meta(session, "world_event")
+    if raw and active:
+        try:
+            data = json.loads(raw)
+            if data.get("forced"):
+                return active
+        except json.JSONDecodeError:
+            pass
+
     weekday = utcnow().astimezone(MSK).weekday()  # 0=Mon ... 4=Fri
     if weekday == 4:  # пятница — ночь рейдов
         key = "raid_night"
@@ -58,6 +69,31 @@ async def ensure_daily_event(session: AsyncSession) -> dict:
     await set_meta(session, "world_event_day", today)
     ev = {**config.WORLD_EVENTS[key], "key": key, "ends_at": ends}
     return ev
+
+
+async def force_event(session: AsyncSession, key: str, hours: float | None = None) -> dict:
+    """Админ: принудительно запустить ивент на N часов."""
+    if key not in config.WORLD_EVENTS:
+        raise ValueError(f"Неизвестный ивент: {key}")
+    h = hours if hours is not None else float(config.ADMIN_EVENT_DEFAULT_HOURS)
+    h = max(0.25, min(float(config.ADMIN_EVENT_MAX_HOURS), float(h)))
+    ends = utcnow() + timedelta(hours=h)
+    payload = {
+        "key": key,
+        "ends_at": ends.isoformat(),
+        "forced": True,
+    }
+    await set_meta(session, "world_event", json.dumps(payload, ensure_ascii=False))
+    # чтобы суточная ротация не сменила ивент в тот же день
+    await set_meta(session, "world_event_day", _today_key())
+    return {**config.WORLD_EVENTS[key], "key": key, "ends_at": ends, "hours": h}
+
+
+async def clear_event(session: AsyncSession) -> dict | None:
+    """Админ: остановить текущий ивент."""
+    prev = await get_active_event(session)
+    await set_meta(session, "world_event", "")
+    return prev
 
 
 def format_event(ev: dict | None) -> str:
@@ -81,6 +117,22 @@ def tax_modifier(ev: dict | None) -> float:
 
 def raid_multiplier(ev: dict | None) -> float:
     return float(ev["raid_mult"]) if ev else 1.0
+
+
+def loot_multiplier(ev: dict | None) -> float:
+    if not ev:
+        return 1.0
+    return float(ev.get("loot_mult") or 1.0)
+
+
+def smuggle_multiplier(ev: dict | None) -> float:
+    if not ev:
+        return 1.0
+    return float(ev.get("smuggle_mult") or 1.0)
+
+
+def raid_blocked(ev: dict | None) -> bool:
+    return bool(ev and ev.get("raid_block"))
 
 
 def raid_cooldown(ev: dict | None) -> timedelta:

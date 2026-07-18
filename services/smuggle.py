@@ -9,7 +9,12 @@ from services.achievements import grant_title
 from services.item_effects import get_buff, get_loadout, set_buff, try_consume_charge
 from services.loot import grant_drop
 from services.player import ensure_aware, regenerate_energy, utcnow
-from services.world_events import get_active_event, tax_modifier, work_multiplier
+from services.world_events import (
+    get_active_event,
+    smuggle_multiplier,
+    tax_modifier,
+    work_multiplier,
+)
 
 
 class SmuggleError(Exception):
@@ -48,6 +53,9 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
         event_key = "gold_vein"
 
     chance = config.SMUGGLE_SUCCESS_CHANCE + loadout.smuggle_chance
+    sm_mult = smuggle_multiplier(ev)
+    if sm_mult != 1.0:
+        chance = chance * sm_mult
     chance = max(0.05, min(0.85, chance))
     success = random.random() < chance
     player.energy -= 1
@@ -57,7 +65,13 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
 
     if success:
         base = random.randint(config.SMUGGLE_REWARD_MIN, config.SMUGGLE_REWARD_MAX)
-        gross = int(base * work_multiplier(ev) * 3 * (1.0 + loadout.smuggle_reward))
+        gross = int(
+            base
+            * work_multiplier(ev)
+            * 3
+            * (1.0 + loadout.smuggle_reward)
+            * sm_mult
+        )
         tax = 0
         if player.nation:
             rate = (player.nation.tax_rate or 0.1) + tax_modifier(ev) + loadout.tax_add
