@@ -69,6 +69,12 @@ def more_keyboard() -> Keyboard:
     kb.add(Text("📅 Цель недели", {"cmd": "weekly"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
+    kb.add(Text("🗺 Континент", {"cmd": "continent"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("📖 Сага", {"cmd": "saga"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("📜 Контракты", {"cmd": "contracts"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🕶 Чёрный рынок", {"cmd": "black_market"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
     kb.add(Text("💡 Предложение", {"cmd": "suggest"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("🐛 Баг", {"cmd": "bug"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
@@ -531,6 +537,8 @@ def war_actions_keyboard(names: list[str]) -> Keyboard:
     kb = Keyboard(one_time=True, inline=False)
     kb.add(Text("📣 Сбор", {"cmd": "muster_open"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("✋ В строй", {"cmd": "muster_join"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("🏰 Осада", {"cmd": "siege"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
     for i, name in enumerate(names[:6]):
         if i and i % 2 == 0:

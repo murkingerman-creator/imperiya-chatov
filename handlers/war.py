@@ -230,6 +230,9 @@ async def _do_raid(message: Message, target: str) -> None:
         drop = result.get("drop")
         if drop:
             extra += f"\n✨ Дроп: {drop['text']}"
+        hall = result.get("trophy_hall")
+        if hall:
+            extra += f"\n🏷 В зал славы: {hall.item_name}"
         notes = result.get("charge_notes") or []
         if notes:
             extra += "\n" + "\n".join(notes)

@@ -327,6 +327,9 @@ TITLE_LABELS = {
     "myth_finder": "🟥 Искатель мифов",
     "novice": "🌱 Новичок",
     "empire_season": "🏛 Империя сезона",
+    "saga_hero": "📖 Герой саги",
+    "siege_breaker": "🛡 Страж стен",
+    "continent_champ": "🗺 Чемпион континента",
 }
 
 # Onboarding
@@ -443,6 +446,88 @@ MARKET_MIN_PRICE = 10
 MARKET_MAX_PRICE = 50000
 MARKET_MAX_LISTINGS = 10
 MARKET_HOURS = 72
+
+# Катаклизм (редкий сутки)
+CATACLYSM_CHANCE_PER_TICK = 0.12  # фон. цикл ~15м
+CATACLYSM_HOURS = 24
+CATACLYSMS = {
+    "comet": {
+        "title": "☄ Падение кометы",
+        "desc": "Небо горит: работы +25%, лут ×2, рейды +20%",
+        "work_mult": 1.25,
+        "loot_mult": 2.0,
+        "raid_mult": 1.2,
+        "chronicle": "Комета разорвала ночь — Империя смотрит в небо.",
+    },
+    "plague_storm": {
+        "title": "🕷 Чумная буря",
+        "desc": "Работы −35%, налог +5 п.п., уникальный дроп тени",
+        "work_mult": 0.65,
+        "loot_mult": 1.5,
+        "raid_mult": 0.9,
+        "tax_add": 0.05,
+        "loot_pool": "shadow",
+        "chronicle": "Чума снова стучится в ворота городов.",
+    },
+    "gold_storm": {
+        "title": "✨ Золотая буря",
+        "desc": "Работы ×1.8, удача лута огромная",
+        "work_mult": 1.8,
+        "loot_mult": 2.5,
+        "raid_mult": 1.0,
+        "chronicle": "С неба сыпалось золото — или так казалось голодным.",
+    },
+}
+
+# Осада
+SIEGE_HOURS = 12
+SIEGE_NEED_PROGRESS = 3
+SIEGE_MAX_ATTEMPTS = 3
+SIEGE_FINALE_STEAL_MULT = 2.0
+
+# Континенты
+CONTINENTS = {
+    "north": "❄ Север",
+    "south": "🔥 Юг",
+    "center": "⚖ Центр",
+}
+CONTINENT_RAID_POINTS = 2
+CONTINENT_WIN_WORK_MULT = 0.06
+CONTINENT_WIN_DAYS = 7
+
+# Недовольство / переворот
+DISCONTENT_PROTEST = 2
+DISCONTENT_RAID_FAIL = 1
+DISCONTENT_THRESHOLD = 12
+DISCONTENT_PROTEST_CD_HOURS = 20
+
+# Трофейный зал
+TROPHY_HALL_CHANCE = 0.22
+TROPHY_HALL_MAX = 12
+
+# Реликвия нации
+NATION_RELIC_EPICS = 5
+NATION_RELIC_WORK = 0.06
+NATION_RELIC_RAID = 0.04
+
+# Контракты
+CONTRACT_MIN_NEED = 3
+CONTRACT_MAX_NEED = 15
+CONTRACT_MIN_REWARD = 40
+CONTRACT_MAX_REWARD = 400
+
+# Чёрный рынок (пт 18–20 МСК или при вспышке)
+BLACK_MARKET_SLOTS = (
+    {"id": "bm_energy", "name": "⚡ Эликсир тьмы", "cost": 25, "kind": "energy"},
+    {"id": "bm_luck", "name": "🍀 Удача хаоса", "cost": 35, "kind": "work_luck"},
+    {"id": "bm_raid", "name": "⚔ Кровавое знамя", "cost": 55, "kind": "raid_bless"},
+    {"id": "bm_wheel", "name": "🎰 Колесо бездны", "cost": 20, "kind": "wheel"},
+)
+
+# Личная сага
+SAGA_DAYS = 7
+SAGA_DAY_REWARD = 40
+SAGA_FINISH_REWARD = 250
 
 
 def require_config() -> None:

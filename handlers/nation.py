@@ -74,6 +74,15 @@ def register(bot: Bot) -> None:
                 text = format_nation_card(
                     player.nation, citizens, ally_line=ally_line
                 )
+                from services.trophies import list_trophies, trophies_line
+
+                trophies = await list_trophies(session, player.nation.id)
+                text += "\n" + trophies_line(trophies)
+                from services.siege import siege_status
+
+                st = await siege_status(session, player.nation)
+                if st:
+                    text += "\n" + st.split("\n")[0]
                 if is_leader:
                     text += "\n👑 Ты лидер"
             else:

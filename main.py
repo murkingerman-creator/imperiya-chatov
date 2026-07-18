@@ -8,8 +8,10 @@ from db.database import SessionLocal, init_db
 from handlers import register_all
 from services.auction import settle_expired_auctions
 from services.broadcast import broadcast
+from services.cataclysm import format_cataclysm, maybe_roll_cataclysm
 from services.chatwars import finish_due_wars
 from services.chronicle import maybe_post_daily_chronicle, post_flash
+from services.continents import maybe_resolve_week
 from services.flash_events import format_flash_announce, maybe_roll_flash
 from services.notify import post_wall
 from services.season import maybe_rotate_season
@@ -45,6 +47,25 @@ async def background_loop(bot: Bot) -> None:
         try:
             async with SessionLocal() as session:
                 await ensure_daily_event(session)
+                cata = await maybe_roll_cataclysm(session)
+                if cata:
+                    announce = format_cataclysm(cata)
+                    try:
+                        await broadcast(
+                            bot.api,
+                            session,
+                            announce,
+                            to_chats=True,
+                            to_dms=False,
+                        )
+                    except Exception as be:
+                        logger.warning("cataclysm broadcast: %s", be)
+                    await post_flash(bot.api, session, announce)
+                    logger.info("Cataclysm: %s", cata.get("key"))
+                week_msg = await maybe_resolve_week(session)
+                if week_msg:
+                    await post_flash(bot.api, session, week_msg)
+                    await post_wall(bot.api, week_msg)
                 flash = await maybe_roll_flash(session)
                 if flash:
                     announce = format_flash_announce(flash)

@@ -212,10 +212,15 @@ async def raid(
         charge_notes.append(f"📣 Сбор: {muster_n} в строю (+сила)")
 
     barracks = barracks_raid_bonus(attacker)
+    from services.trophies import relic_bonuses
+
+    _, relic_r = relic_bonuses(attacker)
     if barracks:
         charge_notes.append(f"⚔ Казарма: +{int(barracks * 100)}% к атаке")
+    if relic_r:
+        charge_notes.append(f"🕯 Реликвия: +{int(relic_r * 100)}% к атаке")
 
-    atk_mult = float(getattr(loadout, "raid_mult", 0.0) or 0.0) + barracks
+    atk_mult = float(getattr(loadout, "raid_mult", 0.0) or 0.0) + barracks + relic_r
     defend_stat = 0.0
     if def_loadout:
         defend_stat = (
@@ -262,8 +267,20 @@ async def raid(
     await add_progress(session, attacker.id, "raid_attempts", 1)
     muster_used = await consume_muster_after_raid(session, attacker)
 
+    from services.siege import apply_siege_on_raid
+
     rolled = random.random()
-    if rolled > chance:
+    success_roll = rolled <= chance
+    siege_info = await apply_siege_on_raid(
+        session, attacker, defender, success=success_roll
+    )
+    if siege_info.get("note"):
+        charge_notes.append(siege_info["note"])
+
+    if not success_roll:
+        from services.discontent import on_raid_fail
+
+        await on_raid_fail(session, attacker)
         await add_points(session, defender.id, config.SEASON_RAID_DEFEND)
         await session.commit()
         return {
@@ -282,6 +299,7 @@ async def raid(
             "roll": rolled,
             "charge_notes": charge_notes,
             "muster": muster_used,
+            "siege": siege_info,
         }
 
     # --- победа: доля от казны зависит от перевеса, не чистый рандом ---
@@ -292,6 +310,11 @@ async def raid(
 
     stolen = max(config.RAID_MIN_STEAL, int(defender.treasury * pct))
     stolen = int(stolen * raid_multiplier(ev, flash))
+    from services.cataclysm import cataclysm_raid_mult, get_cataclysm
+
+    cata = await get_cataclysm(session)
+    stolen = int(stolen * cataclysm_raid_mult(cata))
+    stolen = int(stolen * float(siege_info.get("steal_mult") or 1.0))
     stolen, _ = apply_raid_modifiers(stolen, loadout)
 
     # доп. срез добычи экипом защиты (поверх уже учтённой силы в шансе)
@@ -363,6 +386,16 @@ async def raid(
         loot_mult=loot_multiplier(ev, flash),
     )
 
+    from services.continents import add_continent_points, ensure_nation_continent
+    from services.trophies import maybe_add_trophy
+
+    await ensure_nation_continent(session, attacker)
+    await ensure_nation_continent(session, defender)
+    await add_continent_points(
+        session, attacker, defender, config.CONTINENT_RAID_POINTS
+    )
+    trophy_hall = await maybe_add_trophy(session, attacker, defender)
+
     return {
         "success": True,
         "stolen": stolen,
@@ -375,11 +408,13 @@ async def raid(
         "leader_crowns": leader.crowns,
         "titles": titles,
         "trophy": trophy,
+        "trophy_hall": trophy_hall,
         "event": ev,
         "drop": drop,
         "charge_notes": charge_notes,
         "reflected": reflected,
         "muster": muster_used,
+        "siege": siege_info,
         "atk_citizens": atk_manpower["effective"],
         "def_citizens": def_manpower["effective"],
         "atk_manpower": atk_manpower,

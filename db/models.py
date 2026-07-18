@@ -42,6 +42,18 @@ class Nation(Base):
     muster_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # континент: north | south | center
+    continent: Mapped[str] = mapped_column(String(16), default="center")
+    discontent: Mapped[int] = mapped_column(Integer, default=0)
+    # осада
+    siege_target_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    siege_progress: Mapped[int] = mapped_column(Integer, default=0)
+    siege_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    siege_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # реликвия нации (aura key)
+    nation_relic: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -86,6 +98,11 @@ class Player(Base):
     last_chat_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # можно ли писать в ЛС (False после VK 901/902; True после ответа игрока)
     dm_ok: Mapped[bool] = mapped_column(Boolean, default=True)
+    saga_day: Mapped[int] = mapped_column(Integer, default=0)
+    saga_claimed_day: Mapped[int] = mapped_column(Integer, default=0)
+    last_protest_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -346,5 +363,38 @@ class RaidMusterJoin(Base):
     nation_id: Mapped[int] = mapped_column(Integer, index=True)
     vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
     joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class NationTrophy(Base):
+    """Трофейный зал страны."""
+
+    __tablename__ = "nation_trophies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(Integer, index=True)
+    item_id: Mapped[str] = mapped_column(String(64), default="")
+    item_name: Mapped[str] = mapped_column(String(128), default="")
+    from_nation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class NationContract(Base):
+    """Биржа контрактов страны."""
+
+    __tablename__ = "nation_contracts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nation_id: Mapped[int] = mapped_column(Integer, index=True)
+    job: Mapped[str] = mapped_column(String(32), default="mine")
+    need: Mapped[int] = mapped_column(Integer, default=5)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    reward: Mapped[int] = mapped_column(Integer, default=50)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_by: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

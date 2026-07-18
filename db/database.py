@@ -35,6 +35,9 @@ _PLAYER_COLS = {
     "onboarding_step": "INTEGER DEFAULT 0",
     "last_chat_seen_at": "DATETIME",
     "dm_ok": "INTEGER DEFAULT 1",
+    "saga_day": "INTEGER DEFAULT 0",
+    "saga_claimed_day": "INTEGER DEFAULT 0",
+    "last_protest_at": "DATETIME",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",
@@ -56,6 +59,13 @@ _NATION_COLS = {
     "district_temple": "INTEGER DEFAULT 0",
     "alliance_cd_until": "DATETIME",
     "muster_until": "DATETIME",
+    "continent": "VARCHAR(16) DEFAULT 'center'",
+    "discontent": "INTEGER DEFAULT 0",
+    "siege_target_id": "INTEGER",
+    "siege_progress": "INTEGER DEFAULT 0",
+    "siege_attempts": "INTEGER DEFAULT 0",
+    "siege_until": "DATETIME",
+    "nation_relic": "VARCHAR(64) DEFAULT ''",
 }
 _EQUIPPED_COLS = {
     "upgrade": "INTEGER DEFAULT 0",

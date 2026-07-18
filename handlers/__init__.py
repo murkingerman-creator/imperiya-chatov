@@ -19,6 +19,7 @@ from handlers import (
     tops,
     war,
     work,
+    world_extra,
 )
 
 
@@ -43,6 +44,7 @@ def register_all(bot) -> None:
     nation_extra.register(bot)
     districts.register(bot)
     alliances.register(bot)
+    world_extra.register(bot)
 
     # активность в беседе страны → сила рейда
     from db.database import SessionLocal

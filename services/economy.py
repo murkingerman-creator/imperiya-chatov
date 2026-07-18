@@ -240,19 +240,44 @@ async def finish_minigame(
         gross = max(1, int(gross * 1.10))
         charge_notes.append("📜 Указ о труде: +10% доход")
 
+    from services.cataclysm import cataclysm_loot_mult, cataclysm_work_mult, get_cataclysm
+    from services.continents import get_continent_buff
     from services.districts import market_work_bonus, temple_luck_bonus
     from services.empire import get_empire_status
+    from services.trophies import relic_bonuses
+
+    cata = await get_cataclysm(session)
+    cata_w = cataclysm_work_mult(cata)
+    if cata_w != 1.0:
+        gross = max(1, int(gross * cata_w))
+        charge_notes.append(f"🌪 {cata['title']}: ×{cata_w:.2f}")
 
     market_b = market_work_bonus(player.nation if player.nation_id else None)
     if market_b:
         gross = max(1, int(gross * (1.0 + market_b)))
         charge_notes.append(f"🛒 Рынок столицы: +{int(market_b * 100)}%")
 
+    relic_w, _ = relic_bonuses(player.nation if player.nation_id else None)
+    if relic_w:
+        gross = max(1, int(gross * (1.0 + relic_w)))
+        charge_notes.append(f"🕯 Реликвия нации: +{int(relic_w * 100)}%")
+
     empire = await get_empire_status(session)
     if empire:
         gross = max(1, int(gross * (1.0 + float(empire["work_mult"]))))
         charge_notes.append(
             f"🏛 Указ Империи: +{int(empire['work_mult'] * 100)}%"
+        )
+
+    cbuff = await get_continent_buff(session)
+    if (
+        cbuff
+        and player.nation
+        and (player.nation.continent or "") == cbuff.get("bloc")
+    ):
+        gross = max(1, int(gross * (1.0 + float(cbuff["work_mult"]))))
+        charge_notes.append(
+            f"🗺 Бафф континента: +{int(cbuff['work_mult'] * 100)}%"
         )
 
     if free_mine_ok:
@@ -321,8 +346,16 @@ async def finish_minigame(
     if quest_extra:
         quest = await on_job_done(session, player)
 
+    from services.contracts import on_job_for_contracts
+
+    contract_note = await on_job_for_contracts(session, player, game.job)
+    if contract_note:
+        charge_notes.append(contract_note)
+
     drop_pool = spec.get("loot_pool") or game.job
-    loot_m = loot_multiplier(ev, flash)
+    if cata and cata.get("loot_pool"):
+        drop_pool = cata["loot_pool"]
+    loot_m = loot_multiplier(ev, flash) * cataclysm_loot_mult(cata)
     luck = float(loadout.loot_luck or 0.0)
     luck += temple_luck_bonus(player.nation if player.nation_id else None)
     if empire:

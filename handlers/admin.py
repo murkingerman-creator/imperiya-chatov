@@ -75,6 +75,7 @@ def _help_text() -> str:
         "• !дать / !тюрьма / !свобода / !предмет / !титул\n"
         "• !ивент KEY [часы] · !стоп_ивент\n"
         "• !вспышка [KEY] [часы] · !вспышка_стоп\n"
+        "• !катаклизм [KEY] · !катаклизм_стоп\n"
         "• !джекпот СУММА · !дождь Название СУММА\n"
         "• !всем СУММА [текст] · !принять / !отклонить\n"
         "• !багпринять ID · !баготклонить ID [причина]\n"
@@ -746,6 +747,45 @@ async def _handle_commands(message: Message, text: str, lower: str) -> bool:
         return True
     if lower in {"!вспышка_стоп", "!flash_stop", "!стоп_вспышка"}:
         await _do_stop_flash(message)
+        return True
+    if lower.startswith("!катаклизм") or lower.startswith("!cataclysm"):
+        parts = text.split()
+        if lower in {"!катаклизм_стоп", "!cataclysm_stop", "!стоп_катаклизм"}:
+            from services.cataclysm import clear_cataclysm
+
+            async with SessionLocal() as session:
+                await clear_cataclysm(session)
+            await reply(message, "Катаклизм снят.", keyboard=admin_events_keyboard().get_json())
+            return True
+        key = parts[1].strip() if len(parts) >= 2 else None
+        hours = None
+        if len(parts) >= 3:
+            try:
+                hours = float(parts[2].replace(",", "."))
+            except ValueError:
+                hours = None
+        from services.cataclysm import force_cataclysm
+        from services.broadcast import broadcast, format_report
+
+        try:
+            async with SessionLocal() as session:
+                ev = await force_cataclysm(session, key=key, hours=hours)
+                announce = f"🌪 {ev['title']}\n{ev['desc']}"
+                result = await broadcast(
+                    message.ctx_api, session, announce, to_chats=True, to_dms=False
+                )
+            await reply(
+                message,
+                f"Катаклизм: {ev['title']}\n{format_report(result)}",
+                keyboard=admin_events_keyboard().get_json(),
+            )
+        except Exception as e:
+            keys = ", ".join(sorted(config.CATACLYSMS.keys()))
+            await reply(
+                message,
+                f"{e}\nКлючи: {keys}",
+                keyboard=admin_events_keyboard().get_json(),
+            )
         return True
     if lower in {"!вспышки", "!flash_list"}:
         text_list = list_flashes_text()

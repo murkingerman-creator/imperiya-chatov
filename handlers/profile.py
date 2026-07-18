@@ -6,6 +6,7 @@ from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd
 from services.achievements import format_titles
+from services.cataclysm import format_cataclysm, get_cataclysm
 from services.empire import format_empire_line, get_empire_status
 from services.inventory import discovered_count, get_equipped
 from services.player import (
@@ -40,6 +41,7 @@ def register(bot: Bot) -> None:
             equipped = await get_equipped(session, player.vk_id)
             codex_n = await discovered_count(session, player.vk_id)
             empire = await get_empire_status(session)
+            cata = await get_cataclysm(session)
 
             nation_line = "не в стране"
             if player.nation:
@@ -82,6 +84,11 @@ def register(bot: Bot) -> None:
             )
             empire_line = format_empire_line(empire)
             empire_block = f"\n{empire_line}" if empire_line else ""
+            cata_line = format_cataclysm(cata)
+            cata_block = f"\n{cata_line}" if cata_line else ""
+            saga_line = ""
+            if int(player.saga_day or 0) > 0:
+                saga_line = f"\n📖 Сага: день {min(player.saga_day, 7)}/7"
 
             text = (
                 f"👤 {player.name}\n"
@@ -95,7 +102,7 @@ def register(bot: Bot) -> None:
                 f"📨 Код: {player.invite_code}\n"
                 f"🏛 Страна: {nation_line}"
                 f"{jail_line}"
-                f"{empire_block}\n"
+                f"{empire_block}{cata_block}{saga_line}\n"
                 f"{format_event(ev)}\n"
                 f"{format_flash_event(flash)}"
             )

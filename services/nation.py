@@ -42,9 +42,19 @@ def format_nation_card(
         lines.append(f"Приветствие: {nation.welcome}")
     tax_pct = int(round((nation.tax_rate or 0.1) * 100))
     lines.append(f"💰 Казна: {nation.treasury} · Налог: {tax_pct}% · 👥 {citizens}")
+    from services.continents import continent_label
+    from services.discontent import discontent_line
     from services.districts import districts_card_line
 
+    cont = nation.continent or "center"
+    lines.append(f"🗺 Блок: {continent_label(cont)}")
     lines.append(districts_card_line(nation))
+    lines.append(discontent_line(nation))
+    if nation.nation_relic:
+        lines.append(
+            f"🕯 Реликвия нации: +{int(config.NATION_RELIC_WORK * 100)}% работы, "
+            f"+{int(config.NATION_RELIC_RAID * 100)}% рейд"
+        )
     if ally_line:
         lines.append(ally_line)
     return "\n".join(lines)
@@ -159,6 +169,8 @@ async def found_nation(
         )
 
     player.crowns -= config.NATION_FOUND_COST
+    from services.continents import assign_continent
+
     nation = Nation(
         chat_peer_id=peer_id,
         name=name,
@@ -169,9 +181,11 @@ async def found_nation(
         tax_rate=0.10,
         government="республика",
         color_tag="лазурь",
+        continent="center",  # переназначим после flush по id
     )
     session.add(nation)
     await session.flush()
+    nation.continent = assign_continent(nation.id)
     player.nation_id = nation.id
     await session.commit()
     await session.refresh(player, attribute_names=["nation"])
