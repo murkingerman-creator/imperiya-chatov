@@ -339,6 +339,11 @@ RAID_ACTIVE_HOURS = 48
 RAID_FORCE_ALL_WEIGHT = 0.35
 RAID_FORCE_ACTIVE_WEIGHT = 0.65
 
+# Alliances (unite manpower to raid stronger foes)
+ALLIANCE_FORCE_SHARE = 0.55  # доля силы союзника в атаке
+ALLIANCE_LOOT_SHARE = 0.25  # доля добычи в казну союзника
+ALLIANCE_MAX_PENDING = 3  # исходящих/входящих pending на страну
+
 # Nation announce throttle
 NATION_ANNOUNCE_COOLDOWN_SEC = 8
 

@@ -305,3 +305,21 @@ class BugReport(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class NationAlliance(Base):
+    """Союз двух стран: вместе сильнее в рейде."""
+
+    __tablename__ = "nation_alliances"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # всегда nation_low_id < nation_high_id
+    nation_low_id: Mapped[int] = mapped_column(Integer, index=True)
+    nation_high_id: Mapped[int] = mapped_column(Integer, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    # pending | active
+    proposed_by_id: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

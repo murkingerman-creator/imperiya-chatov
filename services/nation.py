@@ -22,7 +22,9 @@ def is_chat_peer(peer_id: int) -> bool:
     return peer_id >= CHAT_PEER_OFFSET
 
 
-def format_nation_card(nation: Nation, citizens: int) -> str:
+def format_nation_card(
+    nation: Nation, citizens: int, *, ally_line: str | None = None
+) -> str:
     lines = [
         f"{nation.flag_emoji} {nation.name}",
         f"Герб: {nation.emblem_emoji} · Цвет: {nation.color_tag}",
@@ -40,6 +42,8 @@ def format_nation_card(nation: Nation, citizens: int) -> str:
         lines.append(f"Приветствие: {nation.welcome}")
     tax_pct = int(round((nation.tax_rate or 0.1) * 100))
     lines.append(f"💰 Казна: {nation.treasury} · Налог: {tax_pct}% · 👥 {citizens}")
+    if ally_line:
+        lines.append(ally_line)
     return "\n".join(lines)
 
 
@@ -353,6 +357,23 @@ async def apply_invite(
         "treasury_reward": config.INVITE_TREASURY_REWARD if joined_nation else 0,
         "nation": joined_nation,
     }
+
+
+async def list_nations_short_names(
+    session: AsyncSession, *, exclude_id: int | None = None, limit: int = 12
+) -> list[str]:
+    """Короткие имена стран для кнопок (по казне)."""
+    result = await session.execute(
+        select(Nation).order_by(Nation.treasury.desc(), Nation.id.asc()).limit(limit + 2)
+    )
+    names: list[str] = []
+    for n in result.scalars().all():
+        if exclude_id is not None and n.id == exclude_id:
+            continue
+        names.append(n.name)
+        if len(names) >= limit:
+            break
+    return names
 
 
 async def top_nations(session: AsyncSession, limit: int = 10) -> list[tuple[Nation, int]]:

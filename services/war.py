@@ -18,6 +18,7 @@ from services.roles import can_raid
 from services.season import add_points
 from services.weeklies import add_progress
 from services.flash_events import get_flash_event
+from services.alliances import are_allied, get_active_ally
 from services.world_events import (
     get_active_event,
     loot_multiplier,
@@ -174,6 +175,9 @@ async def raid(
     if defender.id == attacker.id:
         raise WarError("Нельзя напасть на свою страну.")
 
+    if await are_allied(session, attacker.id, defender.id):
+        raise WarError("🤝 Нельзя рейдить союзника. Сначала разорвите союз.")
+
     if defender.treasury < config.RAID_MIN_STEAL:
         raise WarError("У цели почти пустая казна — рейд невыгоден.")
 
@@ -187,6 +191,19 @@ async def raid(
     atk_manpower = await nation_manpower(session, attacker.id)
     def_manpower = await nation_manpower(session, defender.id)
 
+    ally = await get_active_ally(session, attacker.id)
+    ally_manpower = None
+    effective_atk = float(atk_manpower["effective"])
+    if ally:
+        ally_manpower = await nation_manpower(session, ally.id)
+        effective_atk += float(ally_manpower["effective"]) * float(
+            config.ALLIANCE_FORCE_SHARE
+        )
+        charge_notes.append(
+            f"🤝 Союз {ally.flag_emoji} {ally.name}: "
+            f"+{int(config.ALLIANCE_FORCE_SHARE * 100)}% силы союзника"
+        )
+
     atk_mult = float(getattr(loadout, "raid_mult", 0.0) or 0.0)
     defend_stat = 0.0
     if def_loadout:
@@ -195,7 +212,7 @@ async def raid(
             + float(def_loadout.nation_treasury_raid_defend or 0.0)
         )
 
-    atk_pwr = attack_force(atk_manpower["effective"], atk_mult)
+    atk_pwr = attack_force(effective_atk, atk_mult)
     def_pwr = defense_force(def_manpower["effective"], defend_stat)
     chance = win_chance(atk_pwr, def_pwr)
     dominance = dominance_ratio(atk_pwr, def_pwr)
@@ -241,10 +258,12 @@ async def raid(
             "success": False,
             "attacker": attacker,
             "defender": defender,
+            "ally": ally,
             "atk_citizens": atk_manpower["effective"],
             "def_citizens": def_manpower["effective"],
             "atk_manpower": atk_manpower,
             "def_manpower": def_manpower,
+            "ally_manpower": ally_manpower,
             "atk_power": round(atk_pwr, 1),
             "def_power": round(def_pwr, 1),
             "chance": chance,
@@ -285,12 +304,19 @@ async def raid(
     share = config.RAID_LEADER_SHARE + loadout.raid_leader_share
     share = max(0.15, min(0.5, share))
     leader_cut = int(stolen * share)
-    treasury_cut = stolen - leader_cut
+    rest = stolen - leader_cut
+    ally_cut = 0
+    if ally:
+        ally_cut = int(rest * float(config.ALLIANCE_LOOT_SHARE))
+        rest -= ally_cut
+    treasury_cut = rest
 
     defender.treasury -= stolen
     if reflected and def_player:
         defender.treasury += reflected
     attacker.treasury += treasury_cut
+    if ally and ally_cut:
+        ally.treasury += ally_cut
     leader.crowns += leader_cut
     await add_points(session, attacker.id, config.SEASON_RAID_WIN)
 
@@ -329,6 +355,8 @@ async def raid(
         "stolen": stolen,
         "leader_cut": leader_cut,
         "treasury_cut": treasury_cut,
+        "ally_cut": ally_cut,
+        "ally": ally,
         "attacker": attacker,
         "defender": defender,
         "leader_crowns": leader.crowns,
@@ -342,6 +370,7 @@ async def raid(
         "def_citizens": def_manpower["effective"],
         "atk_manpower": atk_manpower,
         "def_manpower": def_manpower,
+        "ally_manpower": ally_manpower,
         "atk_power": round(atk_pwr, 1),
         "def_power": round(def_pwr, 1),
         "chance": chance,
@@ -371,7 +400,15 @@ async def preview_raid_odds(
             float(defender_loadout.raid_defend or 0.0)
             + float(defender_loadout.nation_treasury_raid_defend or 0.0)
         )
-    attack = attack_force(attacker_manpower["effective"], loadout.raid_mult)
+    effective = float(attacker_manpower["effective"])
+    ally = await get_active_ally(session, attacker_nation.id)
+    ally_manpower = None
+    if ally:
+        ally_manpower = await nation_manpower(session, ally.id)
+        effective += float(ally_manpower["effective"]) * float(
+            config.ALLIANCE_FORCE_SHARE
+        )
+    attack = attack_force(effective, loadout.raid_mult)
     defense = defense_force(defender_manpower["effective"], defend)
     chance = win_chance(attack, defense)
     shield_until = ensure_aware(defender_nation.shield_until)
@@ -386,6 +423,8 @@ async def preview_raid_odds(
         "def_power": round(defense, 1),
         "attacker_manpower": attacker_manpower,
         "defender_manpower": defender_manpower,
+        "ally": ally,
+        "ally_manpower": ally_manpower,
         "shielded": bool(shield_until and shield_until > utcnow()),
     }
 
@@ -402,11 +441,15 @@ async def raid_candidates(
         .limit(limit * 2)
     )
     nations = list(result.scalars().all())
+    ally = await get_active_ally(session, exclude_nation_id)
+    ally_id = ally.id if ally else None
 
     # boost marked targets (dawn crown aura) to front
     marked = []
     normal = []
     for n in nations:
+        if ally_id and n.id == ally_id:
+            continue
         if await _nation_marked(session, n):
             marked.append(n)
         else:

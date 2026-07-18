@@ -355,11 +355,13 @@ def nation_keyboard(*, in_chat: bool, has_nation: bool, is_leader: bool) -> Keyb
             kb.add(Text("👑 Трон", {"cmd": "transfer_menu"}), color=KeyboardButtonColor.PRIMARY)
             kb.row()
             kb.add(Text("👑 Роли", {"cmd": "roles"}), color=KeyboardButtonColor.PRIMARY)
-            kb.add(Text("⚔ Рейд", {"cmd": "war"}), color=KeyboardButtonColor.NEGATIVE)
+            kb.add(Text("🤝 Союз", {"cmd": "alliance"}), color=KeyboardButtonColor.POSITIVE)
             kb.row()
+            kb.add(Text("⚔ Рейд", {"cmd": "war"}), color=KeyboardButtonColor.NEGATIVE)
             kb.add(Text("🗑 Распустить", {"cmd": "dissolve_nation"}), color=KeyboardButtonColor.NEGATIVE)
         else:
             kb.row()
+            kb.add(Text("🤝 Союз", {"cmd": "alliance"}), color=KeyboardButtonColor.POSITIVE)
             kb.add(Text("⚔ Рейд", {"cmd": "war"}), color=KeyboardButtonColor.NEGATIVE)
     else:
         if in_chat:
@@ -488,14 +490,37 @@ def cancel_keyboard() -> Keyboard:
     return kb
 
 
-def raid_targets_keyboard(names: list[str]) -> Keyboard:
+def raid_targets_keyboard(names: list[str], *, cmd: str = "raid") -> Keyboard:
     kb = Keyboard(one_time=True, inline=False)
+    emoji = "⚔" if cmd == "raid" else "🤝"
+    color = (
+        KeyboardButtonColor.NEGATIVE
+        if cmd == "raid"
+        else KeyboardButtonColor.POSITIVE
+    )
     for i, name in enumerate(names[:6]):
         if i and i % 2 == 0:
             kb.row()
-        kb.add(Text(f"⚔ {name}", {"cmd": "raid", "target": name}), color=KeyboardButtonColor.NEGATIVE)
+        kb.add(
+            Text(f"{emoji} {name}", {"cmd": cmd, "target": name}),
+            color=color,
+        )
     kb.row()
-    kb.add(Text("❌ Отмена", {"cmd": "cancel"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("❌ Отмена", {"cmd": "alliance" if cmd != "raid" else "cancel"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def alliance_keyboard(*, is_leader: bool) -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    if is_leader:
+        kb.add(Text("📨 Предложить", {"cmd": "ally_propose"}), color=KeyboardButtonColor.POSITIVE)
+        kb.add(Text("✅ Принять", {"cmd": "ally_accept"}), color=KeyboardButtonColor.PRIMARY)
+        kb.row()
+        kb.add(Text("❌ Отклонить", {"cmd": "ally_reject"}), color=KeyboardButtonColor.SECONDARY)
+        kb.add(Text("💔 Разорвать", {"cmd": "ally_break"}), color=KeyboardButtonColor.NEGATIVE)
+        kb.row()
+    kb.add(Text("🏛 Страна", {"cmd": "nation"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 

@@ -65,7 +65,15 @@ def register(bot: Bot) -> None:
 
             if player.nation:
                 citizens = await count_citizens(session, player.nation.id)
-                text = format_nation_card(player.nation, citizens)
+                from services.alliances import get_active_ally
+
+                ally = await get_active_ally(session, player.nation.id)
+                ally_line = (
+                    f"🤝 Союз: {ally.flag_emoji} {ally.name}" if ally else None
+                )
+                text = format_nation_card(
+                    player.nation, citizens, ally_line=ally_line
+                )
                 if is_leader:
                     text += "\n👑 Ты лидер"
             else:

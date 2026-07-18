@@ -1,5 +1,6 @@
 from handlers import (
     admin,
+    alliances,
     bugs,
     customize,
     daily,
@@ -39,6 +40,7 @@ def register_all(bot) -> None:
     bugs.register(bot)
     nation.register(bot)
     nation_extra.register(bot)
+    alliances.register(bot)
 
     # активность в беседе страны → сила рейда
     from db.database import SessionLocal

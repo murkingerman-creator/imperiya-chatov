@@ -47,10 +47,18 @@ def _is_raid_text(message: Message) -> bool:
 def _battle_line(result: dict) -> str:
     atk_m = result.get("atk_manpower") or {}
     def_m = result.get("def_manpower") or {}
+    ally = result.get("ally")
+    ally_m = result.get("ally_manpower") or {}
+    ally_bit = ""
+    if ally:
+        ally_bit = (
+            f" +🤝{ally.flag_emoji}{ally.name}"
+            f"(👥{ally_m.get('total', '?')}/{ally_m.get('active', '?')})"
+        )
     return (
         f"⚔ Сила: {result['atk_power']} "
         f"(👥{atk_m.get('total', result.get('atk_citizens', '?'))}"
-        f"/{atk_m.get('active', '?')} акт.) "
+        f"/{atk_m.get('active', '?')} акт.{ally_bit}) "
         f"vs {result['def_power']} "
         f"(👥{def_m.get('total', result.get('def_citizens', '?'))}"
         f"/{def_m.get('active', '?')} акт.)\n"
@@ -104,10 +112,12 @@ def register(bot: Bot) -> None:
                 odds = await preview_raid_odds(session, player.nation, t, player)
                 dm = odds["defender_manpower"]
                 shield = " 🛡" if odds["shielded"] else ""
+                ally = odds.get("ally")
+                ally_mark = f" ·🤝{ally.name}" if ally else ""
                 lines.append(
                     f"• {t.flag_emoji} {t.name} — казна {t.treasury} · "
                     f"👥{dm['total']}/{dm['active']}акт · "
-                    f"~{int(odds['chance'] * 100)}%{shield}"
+                    f"~{int(odds['chance'] * 100)}%{shield}{ally_mark}"
                 )
 
             await reply(
@@ -184,12 +194,19 @@ async def _do_raid(message: Message, target: str) -> None:
             extra += "\n" + "\n".join(notes)
         if result.get("reflected"):
             extra += f"\n🛡 Отражено защитой: {result['reflected']}"
+        ally = result.get("ally")
+        ally_cut = int(result.get("ally_cut") or 0)
+        loot_line = (
+            f"В казну: +{result['treasury_cut']} · Лидеру: +{result['leader_cut']}"
+        )
+        if ally and ally_cut:
+            loot_line += f" · Союзу {ally.name}: +{ally_cut}"
         text = (
             f"⚔ Рейд удался!\n"
             f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
             f"{battle}\n"
             f"Захвачено: {result['stolen']}\n"
-            f"В казну: +{result['treasury_cut']} · Лидеру: +{result['leader_cut']}"
+            f"{loot_line}"
             f"{extra}"
         )
         await add_event(
@@ -217,4 +234,14 @@ async def _do_raid(message: Message, target: str) -> None:
             dfn.chat_peer_id,
             f"💥 Нас ограбили! {atk.flag_emoji} {atk.name} унесли {result['stolen']}\n{battle}",
         )
+        ally = result.get("ally")
+        ally_cut = int(result.get("ally_cut") or 0)
+        if ally and ally_cut and ally.chat_peer_id:
+            await notify_nation_chat(
+                message.ctx_api,
+                ally.chat_peer_id,
+                f"🤝 Союзный рейд! {atk.flag_emoji} {atk.name} → "
+                f"{dfn.flag_emoji} {dfn.name}\n"
+                f"В вашу казну: +{ally_cut}",
+            )
         await reply(message, text, keyboard=main_keyboard().get_json())
