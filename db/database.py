@@ -40,6 +40,7 @@ _PLAYER_COLS = {
     "last_protest_at": "DATETIME",
     "xp": "INTEGER DEFAULT 0",
     "level": "INTEGER DEFAULT 1",
+    "last_wheel_at": "DATETIME",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",
@@ -76,6 +77,10 @@ _NATION_COLS = {
 }
 _EQUIPPED_COLS = {
     "upgrade": "INTEGER DEFAULT 0",
+    "bound": "INTEGER DEFAULT 0",
+}
+_INVENTORY_COLS = {
+    "bound_qty": "INTEGER DEFAULT 0",
 }
 
 
@@ -94,6 +99,7 @@ async def init_db() -> None:
             await _ensure_columns(conn, "players", _PLAYER_COLS)
             await _ensure_columns(conn, "nations", _NATION_COLS)
             await _ensure_columns(conn, "equipped_items", _EQUIPPED_COLS)
+            await _ensure_columns(conn, "inventory_items", _INVENTORY_COLS)
         except Exception:
             pass
 

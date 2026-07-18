@@ -66,6 +66,12 @@ async def create_listing(
         raise MarketError(f"Максимум {config.MARKET_MAX_LISTINGS} лотов одновременно.")
 
     try:
+        from services.inventory import unbound_qty
+
+        if await unbound_qty(session, seller.vk_id, item_id) < 1:
+            raise MarketError(
+                "Трофеи колеса нельзя выставить на рынок — только обычный выкуп в сумке."
+            )
         await _dec_bag(session, seller.vk_id, item_id, 1)
     except InventoryError as e:
         raise MarketError(e.message) from e

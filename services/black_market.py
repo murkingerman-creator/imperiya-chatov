@@ -68,11 +68,21 @@ async def buy_black(session: AsyncSession, player: Player, slot_id: str) -> str:
     if kind == "wheel":
         from services.shop import buy_wheel
 
-        player.crowns += cost  # buy_wheel спишет свою цену
-        msg = await buy_wheel(session, player)
-        refund = max(0, int(config.SHOP_WHEEL_COST) - cost)
-        if refund:
-            player.crowns += refund
-            await session.commit()
-        return f"🕶 {msg} (цена рынка {cost})"
+        # уже списали cost слота — вернём, buy_wheel спишет ту же сумму
+        player.crowns += cost
+        result = await buy_wheel(session, player, cost=cost)
+        if result["type"] == "empty":
+            body = "пусто… империя забрала ставку"
+        elif result["type"] == "crowns":
+            body = f"+{result['amount']} крон"
+        else:
+            it = result["item"]
+            body = (
+                f"{it.get('emoji', '')} {it['name']} ({it['rarity']}) "
+                f"— трофей колеса (−{int((1 - config.SHOP_WHEEL_SELL_MULT) * 100)}% выкуп)"
+            )
+        return (
+            f"🕶 Колесо бездны (−{cost})!\n{body}\n"
+            f"💰 {result['crowns']}"
+        )
     raise ShopError("Слот сломан.")

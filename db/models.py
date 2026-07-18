@@ -110,6 +110,9 @@ class Player(Base):
     )
     xp: Mapped[int] = mapped_column(Integer, default=0)
     level: Mapped[int] = mapped_column(Integer, default=1)
+    last_wheel_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -213,6 +216,8 @@ class InventoryItem(Base):
     player_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
     item_id: Mapped[str] = mapped_column(String(64), index=True)
     qty: Mapped[int] = mapped_column(Integer, default=1)
+    # трофеи колеса: продаются дешевле, нельзя выставить на рынок
+    bound_qty: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class EquippedItem(Base):
@@ -223,6 +228,8 @@ class EquippedItem(Base):
     slot: Mapped[str] = mapped_column(String(16))
     item_id: Mapped[str] = mapped_column(String(64))
     upgrade: Mapped[int] = mapped_column(Integer, default=0)
+    # трофей колеса — при снятии снова bound
+    bound: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ItemCharge(Base):

@@ -19,7 +19,12 @@ class InventoryError(Exception):
 
 
 async def add_item(
-    session: AsyncSession, player: Player, item_id: str, qty: int = 1
+    session: AsyncSession,
+    player: Player,
+    item_id: str,
+    qty: int = 1,
+    *,
+    bound: bool = False,
 ) -> dict:
     it = cat.get_item(item_id)
     if not it:
@@ -34,9 +39,16 @@ async def add_item(
     row = result.scalar_one_or_none()
     if row:
         row.qty += qty
+        if bound:
+            row.bound_qty = min(row.qty, int(row.bound_qty or 0) + qty)
     else:
         session.add(
-            InventoryItem(player_vk_id=player.vk_id, item_id=item_id, qty=qty)
+            InventoryItem(
+                player_vk_id=player.vk_id,
+                item_id=item_id,
+                qty=qty,
+                bound_qty=qty if bound else 0,
+            )
         )
 
     first = await _mark_discovered(session, player.vk_id, item_id)
@@ -134,22 +146,31 @@ async def equip(session: AsyncSession, player: Player, item_id: str) -> dict:
     prev_row = prev.scalar_one_or_none()
     old_id = prev_row.item_id if prev_row else None
 
+    took_bound = await _dec_bag(session, player.vk_id, item_id, 1)
     if prev_row:
+        # старый предмет возвращаем с его флагом bound
+        await _inc_bag(
+            session, player.vk_id, old_id, 1, bound=bool(prev_row.bound)
+        )
         prev_row.item_id = item_id
+        prev_row.bound = took_bound
+        prev_row.upgrade = 0
     else:
         session.add(
-            EquippedItem(player_vk_id=player.vk_id, slot=slot, item_id=item_id)
+            EquippedItem(
+                player_vk_id=player.vk_id,
+                slot=slot,
+                item_id=item_id,
+                bound=took_bound,
+            )
         )
-
-    await _dec_bag(session, player.vk_id, item_id, 1)
-    if old_id:
-        await _inc_bag(session, player.vk_id, old_id, 1)
 
     await session.commit()
     return {
         "item": it,
         "slot": slot,
         "mythic_announce": it["rarity"] == "mythic",
+        "bound": took_bound,
     }
 
 
@@ -166,7 +187,7 @@ async def unequip(session: AsyncSession, player: Player, slot: str) -> dict:
     if not row:
         raise InventoryError("Слот пуст.")
     it = cat.get_item(row.item_id)
-    await _inc_bag(session, player.vk_id, row.item_id, 1)
+    await _inc_bag(session, player.vk_id, row.item_id, 1, bound=bool(row.bound))
     await session.delete(row)
     await session.commit()
     return {"item": it, "slot": slot}
@@ -201,7 +222,14 @@ async def upgrade_equipped(
     }
 
 
-async def _inc_bag(session: AsyncSession, vk_id: int, item_id: str, qty: int) -> None:
+async def _inc_bag(
+    session: AsyncSession,
+    vk_id: int,
+    item_id: str,
+    qty: int,
+    *,
+    bound: bool = False,
+) -> None:
     result = await session.execute(
         select(InventoryItem).where(
             InventoryItem.player_vk_id == vk_id,
@@ -211,11 +239,24 @@ async def _inc_bag(session: AsyncSession, vk_id: int, item_id: str, qty: int) ->
     row = result.scalar_one_or_none()
     if row:
         row.qty += qty
+        if bound:
+            row.bound_qty = min(row.qty, int(row.bound_qty or 0) + qty)
     else:
-        session.add(InventoryItem(player_vk_id=vk_id, item_id=item_id, qty=qty))
+        session.add(
+            InventoryItem(
+                player_vk_id=vk_id,
+                item_id=item_id,
+                qty=qty,
+                bound_qty=qty if bound else 0,
+            )
+        )
 
 
-async def _dec_bag(session: AsyncSession, vk_id: int, item_id: str, qty: int) -> None:
+async def _dec_bag(
+    session: AsyncSession, vk_id: int, item_id: str, qty: int
+) -> bool:
+    """Списать qty. Сначала unbound. Возвращает True, если списали bound-экземпляр
+    (для qty=1 — был ли этот предмет с колеса)."""
     result = await session.execute(
         select(InventoryItem).where(
             InventoryItem.player_vk_id == vk_id,
@@ -225,9 +266,29 @@ async def _dec_bag(session: AsyncSession, vk_id: int, item_id: str, qty: int) ->
     row = result.scalar_one_or_none()
     if not row or row.qty < qty:
         raise InventoryError("Недостаточно предметов в сумке.")
+    bound_qty = int(row.bound_qty or 0)
+    unbound = row.qty - bound_qty
+    take_unbound = min(qty, unbound)
+    take_bound = qty - take_unbound
     row.qty -= qty
+    row.bound_qty = bound_qty - take_bound
     if row.qty <= 0:
         await session.delete(row)
+    # для экипировки qty=1: True если взяли bound
+    return take_bound > 0 and take_unbound == 0
+
+
+async def unbound_qty(session: AsyncSession, vk_id: int, item_id: str) -> int:
+    result = await session.execute(
+        select(InventoryItem).where(
+            InventoryItem.player_vk_id == vk_id,
+            InventoryItem.item_id == item_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        return 0
+    return max(0, row.qty - int(row.bound_qty or 0))
 
 
 async def sell_item(session: AsyncSession, player: Player, item_id: str, qty: int = 1) -> dict:
@@ -243,11 +304,35 @@ async def sell_item(session: AsyncSession, player: Player, item_id: str, qty: in
     )
     if eq.scalar_one_or_none():
         raise InventoryError("Сначала сними предмет.")
-    price = cat.SELL_PRICE.get(it["rarity"], 10) * qty
+
+    result = await session.execute(
+        select(InventoryItem).where(
+            InventoryItem.player_vk_id == player.vk_id,
+            InventoryItem.item_id == item_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row or row.qty < qty:
+        raise InventoryError("Недостаточно предметов в сумке.")
+
+    base = cat.SELL_PRICE.get(it["rarity"], 10)
+    bound_qty = int(row.bound_qty or 0)
+    unbound = row.qty - bound_qty
+    sell_unbound = min(qty, unbound)
+    sell_bound = qty - sell_unbound
+    mult = float(config.SHOP_WHEEL_SELL_MULT)
+    price = base * sell_unbound + max(1, int(base * mult)) * sell_bound
+
     await _dec_bag(session, player.vk_id, item_id, qty)
     player.crowns += price
     await session.commit()
-    return {"item": it, "qty": qty, "price": price, "crowns": player.crowns}
+    return {
+        "item": it,
+        "qty": qty,
+        "price": price,
+        "crowns": player.crowns,
+        "bound_sold": sell_bound,
+    }
 
 
 async def donate_item(session: AsyncSession, player: Player, item_id: str) -> dict:

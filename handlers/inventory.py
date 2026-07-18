@@ -24,6 +24,7 @@ from services.inventory import (
     list_bag,
     merge_commons,
     sell_item,
+    unbound_qty,
     unequip,
     upgrade_equipped,
 )
@@ -155,11 +156,24 @@ def register(bot: Bot) -> None:
         if not it:
             await reply(message, "Предмет не найден.", keyboard=bag_keyboard().get_json())
             return
-        price = cat.SELL_PRICE.get(it["rarity"], 10)
-        await reply(message, 
+        base = cat.SELL_PRICE.get(it["rarity"], 10)
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            free = await unbound_qty(session, player.vk_id, item_id)
+        if free >= 1:
+            price = base
+            hint = ""
+        else:
+            from bot import config as _cfg
+
+            price = max(1, int(base * _cfg.SHOP_WHEEL_SELL_MULT))
+            hint = " (трофей колеса, уценка)"
+        await reply(
+            message,
             f"💰 Продажа боту\n"
             f"{cat.format_item(it)}\n"
-            f"Цена: {price} крон\n\n"
+            f"Цена: {price} крон{hint}\n\n"
             f"Точно продать?",
             keyboard=confirm_sell_bot_keyboard(item_id, price).get_json(),
         )
@@ -176,9 +190,13 @@ def register(bot: Bot) -> None:
             except InventoryError as e:
                 await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
-            await reply(message, 
-                f"Продано: {cat.format_item(result['item'])} → +{result['price']}\n"
-                f"💰 {result['crowns']}",
+            note = ""
+            if result.get("bound_sold"):
+                note = " (трофей колеса, уценка)\n"
+            await reply(
+                message,
+                f"Продано: {cat.format_item(result['item'])} → +{result['price']}"
+                f"{note}\n💰 {result['crowns']}",
                 keyboard=bag_keyboard().get_json(),
             )
 

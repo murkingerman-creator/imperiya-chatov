@@ -56,7 +56,9 @@ def shop_catalog_text(player: Player) -> str:
         f"(твои кроны → казна страны)\n"
         f"⚔ Знамя рейда — {config.SHOP_RAID_BLESS_COST} "
         f"(+{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс к следующему рейду)\n"
-        f"🎰 Колесо удачи — {config.SHOP_WHEEL_COST} (кроны или предмет)\n"
+        f"🎰 Колесо удачи — {config.SHOP_WHEEL_COST} "
+        f"(кд {config.SHOP_WHEEL_COOLDOWN_SEC // 60} мин; "
+        f"трофеи −{int((1 - config.SHOP_WHEEL_SELL_MULT) * 100)}% к выкупу)\n"
         f"🛡 Взнос в щит страны — {config.NATION_SHIELD_CONTRIB}\n\n"
         f"У тебя: {player.crowns} крон · ⚡ {player.energy}/{config.MAX_ENERGY}"
     )
@@ -154,23 +156,62 @@ async def buy_raid_bless(session: AsyncSession, player: Player) -> dict:
     }
 
 
-async def buy_wheel(session: AsyncSession, player: Player) -> dict:
-    """Spin the imperial wheel for crowns or a randomly selected arsenal item."""
-    cost = config.SHOP_WHEEL_COST
-    if player.crowns < cost:
-        raise ShopError(f"Нужно {cost} крон (у тебя {player.crowns}).")
-    player.crowns -= cost
+async def buy_wheel(
+    session: AsyncSession,
+    player: Player,
+    cost: int | None = None,
+) -> dict:
+    """Колесо: отрицательный EV, трофеи bound (дешёвый выкуп / не на рынок)."""
+    spin_cost = int(cost if cost is not None else config.SHOP_WHEEL_COST)
+    cd = int(config.SHOP_WHEEL_COOLDOWN_SEC)
+    last = ensure_aware(player.last_wheel_at)
+    if last and cd > 0:
+        left = cd - int((utcnow() - last).total_seconds())
+        if left > 0:
+            raise ShopError(f"Колесо остывает ещё {left} сек.")
+    if player.crowns < spin_cost:
+        raise ShopError(f"Нужно {spin_cost} крон (у тебя {player.crowns}).")
+    player.crowns -= spin_cost
+    player.last_wheel_at = utcnow()
+
+    # empty / crowns / item — дом в плюсе (~35–40%)
     reward_type = random.choices(
-        ("crowns", "item"), weights=(45, 55), k=1
+        ("empty", "crowns", "item"), weights=(12, 53, 35), k=1
     )[0]
+
+    if reward_type == "empty":
+        await session.commit()
+        return {
+            "cost": spin_cost,
+            "type": "empty",
+            "crowns": player.crowns,
+        }
+
     if reward_type == "crowns":
-        amount = random.choices((25, 50, 100, 200), weights=(50, 30, 15, 5), k=1)[0]
+        amount = random.choices(
+            (20, 35, 50, 90, 180), weights=(30, 30, 22, 13, 5), k=1
+        )[0]
         player.crowns += amount
         await session.commit()
-        return {"cost": cost, "type": "crowns", "amount": amount, "crowns": player.crowns}
+        return {
+            "cost": spin_cost,
+            "type": "crowns",
+            "amount": amount,
+            "crowns": player.crowns,
+        }
 
     items = cat.all_items()
-    weights = [config.LOOT_RARITY_WEIGHTS.get(item["rarity"], 1.0) for item in items]
+    weights = [
+        config.WHEEL_RARITY_WEIGHTS.get(item["rarity"], 0.0) for item in items
+    ]
+    if sum(weights) <= 0:
+        weights = [1.0] * len(items)
     item = random.choices(items, weights=weights, k=1)[0]
-    await add_item(session, player, item["id"])
-    return {"cost": cost, "type": "item", "item": item, "crowns": player.crowns}
+    await add_item(session, player, item["id"], bound=True)
+    return {
+        "cost": spin_cost,
+        "type": "item",
+        "item": item,
+        "crowns": player.crowns,
+        "bound": True,
+    }

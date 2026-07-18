@@ -3,6 +3,7 @@
 from vkbottle.bot import Bot, Message
 
 from bot.keyboards import main_keyboard, shop_keyboard
+from bot import config
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd, text_in
@@ -102,16 +103,24 @@ async def _do_buy(message: Message, item: str) -> None:
                 )
             elif item == "wheel":
                 result = await buy_wheel(session, player)
-                if result["type"] == "crowns":
+                if result["type"] == "empty":
+                    text = (
+                        f"🎰 Колесо (−{result['cost']})…\n"
+                        f"Ничего. Империя улыбнулась.\n"
+                        f"💰 {result['crowns']}"
+                    )
+                elif result["type"] == "crowns":
                     text = (
                         f"🎰 Колесо (−{result['cost']})!\n"
                         f"+{result['amount']} крон\n💰 {result['crowns']}"
                     )
                 else:
                     it = result["item"]
+                    cut = int((1 - config.SHOP_WHEEL_SELL_MULT) * 100)
                     text = (
                         f"🎰 Колесо (−{result['cost']})!\n"
                         f"✨ {it.get('emoji', '')} {it['name']} ({it['rarity']})\n"
+                        f"⛓ Трофей колеса: выкуп −{cut}%, на рынок нельзя.\n"
                         f"💰 {result['crowns']}"
                     )
                     if it.get("rarity") in ("rare", "epic", "legendary", "mythic"):

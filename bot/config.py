@@ -442,8 +442,20 @@ SEASON_RAID_WIN = 2
 SEASON_RAID_DEFEND = 1
 SEASON_CHATWAR_WIN = 5
 
-# Lottery wheel
-SHOP_WHEEL_COST = 40
+# Lottery wheel (казино: дом в плюсе, безфарма «крутнул→продал»)
+SHOP_WHEEL_COST = 50
+SHOP_WHEEL_COOLDOWN_SEC = 120
+# трофеи колеса продаются в лавку за эту долю от обычной цены
+SHOP_WHEEL_SELL_MULT = 0.35
+# веса редкости только для колеса (без легенд/мификов)
+WHEEL_RARITY_WEIGHTS = {
+    "common": 82.0,
+    "uncommon": 15.0,
+    "rare": 2.7,
+    "epic": 0.3,
+    "legendary": 0.0,
+    "mythic": 0.0,
+}
 
 # Item upgrade
 UPGRADE_MAX = 3
@@ -567,7 +579,7 @@ BLACK_MARKET_SLOTS = (
     {"id": "bm_energy", "name": "⚡ Эликсир тьмы", "cost": 25, "kind": "energy"},
     {"id": "bm_luck", "name": "🍀 Удача хаоса", "cost": 35, "kind": "work_luck"},
     {"id": "bm_raid", "name": "⚔ Кровавое знамя", "cost": 55, "kind": "raid_bless"},
-    {"id": "bm_wheel", "name": "🎰 Колесо бездны", "cost": 20, "kind": "wheel"},
+    {"id": "bm_wheel", "name": "🎰 Колесо бездны", "cost": 40, "kind": "wheel"},
 )
 
 # Личная сага
