@@ -301,7 +301,7 @@ def nation_keyboard(*, in_chat: bool, has_nation: bool, is_leader: bool) -> Keyb
 def treasury_keyboard() -> Keyboard:
     kb = Keyboard(one_time=False, inline=False)
     kb.add(Text("⚒ Указ", {"cmd": "tr_spend", "action": "work"}), color=KeyboardButtonColor.POSITIVE)
-    kb.add(Text("⚔ Сбор", {"cmd": "tr_spend", "action": "levy"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("📜 Воен.сбор", {"cmd": "tr_spend", "action": "levy"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
     kb.add(Text("💰 Раздача", {"cmd": "tr_spend", "action": "payout"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("🕊 Амнистия", {"cmd": "tr_spend", "action": "amnesty"}), color=KeyboardButtonColor.SECONDARY)

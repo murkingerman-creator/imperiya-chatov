@@ -21,9 +21,27 @@ from services.war import (
 
 RAID_RE = re.compile(r"^(?:⚔|рейд)\s+(.+)$", re.IGNORECASE)
 
+# Текст кнопки «⚔ …» не должен считаться командой рейда, если есть payload
+_RAID_TEXT_BLOCKLIST = {
+    "сбор",
+    "указ",
+    "раздача",
+    "амнистия",
+}
+
 
 def _is_raid_text(message: Message) -> bool:
-    return bool(RAID_RE.match((message.text or "").strip()))
+    payload = message.get_payload_json() or {}
+    if isinstance(payload, dict) and payload.get("cmd"):
+        return False
+    text = (message.text or "").strip()
+    m = RAID_RE.match(text)
+    if not m:
+        return False
+    target = m.group(1).strip().casefold()
+    if target in _RAID_TEXT_BLOCKLIST:
+        return False
+    return True
 
 
 def _battle_line(result: dict) -> str:
