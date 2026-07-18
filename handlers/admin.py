@@ -62,7 +62,7 @@ def register(bot: Bot) -> None:
             "• !объявление_лс текст\n"
             "• !принять ID — принять предложение\n"
             "• !отклонить ID [причина]\n"
-            "• !всем СУММА — кроны всем за обновление\n",
+            "• !всем СУММА [текст] — кроны всем + рассылка\n",
             keyboard=admin_keyboard().get_json(),
         )
 
@@ -162,8 +162,11 @@ def register(bot: Bot) -> None:
         await reply(
             message,
             "🎁 Бонус всем за обновление\n"
-            "Напиши сумму крон (число).\n"
+            "Напиши сумму — кроны начислятся всем, и сообщение уйдёт в беседы + ЛС.\n\n"
+            "Формат: СУММА\n"
+            "Или: СУММА свой текст объявления\n"
             "Пример: 100\n"
+            "Пример: 100 Спасибо за игру — ловите бонус!\n"
             "Или «отмена».",
             keyboard=cancel_keyboard().get_json(),
         )
@@ -295,24 +298,25 @@ def register(bot: Bot) -> None:
                 )
             return
         if lower.startswith("!всем ") or lower.startswith("!giveall "):
-            parts = text.split()
+            parts = text.split(maxsplit=2)
             if len(parts) >= 2:
                 try:
                     amount = int(parts[1])
                 except ValueError:
                     amount = None
                 if amount is not None:
-                    await _do_give_all(message, amount)
+                    note = parts[2] if len(parts) >= 3 else ""
+                    await _do_give_all(message, amount, note)
                 else:
                     await reply(
                         message,
-                        "Формат: !всем СУММА",
+                        "Формат: !всем СУММА [текст]",
                         keyboard=admin_keyboard().get_json(),
                     )
             else:
                 await reply(
                     message,
-                    "Формат: !всем СУММА",
+                    "Формат: !всем СУММА [текст]",
                     keyboard=admin_keyboard().get_json(),
                 )
             return
@@ -342,7 +346,10 @@ def register(bot: Bot) -> None:
                 parts = text.split()
                 await _do_give(message, int(parts[0]), int(parts[1]))
             elif mode == "give_all":
-                await _do_give_all(message, int(text.split()[0]))
+                parts = text.split(maxsplit=1)
+                amount = int(parts[0])
+                note = parts[1] if len(parts) >= 2 else ""
+                await _do_give_all(message, amount, note)
             elif mode == "energy":
                 await _do_energy(message, int(text.split()[0]))
             elif mode == "cd":
@@ -397,7 +404,7 @@ async def _do_give(message: Message, vk_id: int, amount: int) -> None:
         )
 
 
-async def _do_give_all(message: Message, amount: int) -> None:
+async def _do_give_all(message: Message, amount: int, note: str = "") -> None:
     if not await _require(message):
         return
     async with SessionLocal() as session:
@@ -406,11 +413,39 @@ async def _do_give_all(message: Message, amount: int) -> None:
         except AdminError as e:
             await reply(message, e.message, keyboard=admin_keyboard().get_json())
             return
+
+    note = (note or "").strip()
+    body = (
+        f"🎁 Бонус за обновление!\n\n"
+        f"Всем игрокам начислено {amount:+d} крон."
+    )
+    if note:
+        body += f"\n\n{note}"
+    else:
+        body += "\n\nСпасибо, что играете в Империю чатов!"
+
     await reply(
         message,
-        f"🎁 Всем начислено {amount:+d} крон\n"
-        f"Игроков: {result['count']}\n"
-        f"Всего выдано: {result['total']:+d}",
+        f"🎁 Начислено {amount:+d} × {result['count']} игроков "
+        f"(всего {result['total']:+d}).\n"
+        f"⏳ Рассылка сообщения…",
+        keyboard=admin_keyboard().get_json(),
+    )
+    async with SessionLocal() as session:
+        try:
+            report = await broadcast(
+                message.ctx_api,
+                session,
+                body,
+                to_chats=True,
+                to_dms=True,
+            )
+        except ValueError as e:
+            await reply(message, str(e), keyboard=admin_keyboard().get_json())
+            return
+    await reply(
+        message,
+        format_report(report),
         keyboard=admin_keyboard().get_json(),
     )
 
