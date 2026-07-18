@@ -120,7 +120,7 @@ async def _do_buy(message: Message, item: str) -> None:
                     text = (
                         f"🎰 Колесо (−{result['cost']})!\n"
                         f"✨ {it.get('emoji', '')} {it['name']} ({it['rarity']})\n"
-                        f"⛓ Трофей колеса: выкуп −{cut}%, на рынок нельзя.\n"
+                        f"⛓ Трофей колеса: выкуп у бота −{cut}% (на торг — как хочешь).\n"
                         f"💰 {result['crowns']}"
                     )
                     if it.get("rarity") in ("rare", "epic", "legendary", "mythic"):

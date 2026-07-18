@@ -57,8 +57,8 @@ def shop_catalog_text(player: Player) -> str:
         f"⚔ Знамя рейда — {config.SHOP_RAID_BLESS_COST} "
         f"(+{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс к следующему рейду)\n"
         f"🎰 Колесо удачи — {config.SHOP_WHEEL_COST} "
-        f"(кд {config.SHOP_WHEEL_COOLDOWN_SEC // 60} мин; "
-        f"трофеи −{int((1 - config.SHOP_WHEEL_SELL_MULT) * 100)}% к выкупу)\n"
+        f"(кд {config.SHOP_WHEEL_COOLDOWN_SEC} сек; "
+        f"выкуп трофеев −{int((1 - config.SHOP_WHEEL_SELL_MULT) * 100)}%)\n"
         f"🛡 Взнос в щит страны — {config.NATION_SHIELD_CONTRIB}\n\n"
         f"У тебя: {player.crowns} крон · ⚡ {player.energy}/{config.MAX_ENERGY}"
     )
@@ -161,7 +161,7 @@ async def buy_wheel(
     player: Player,
     cost: int | None = None,
 ) -> dict:
-    """Колесо: отрицательный EV, трофеи bound (дешёвый выкуп / не на рынок)."""
+    """Колесо: отрицательный EV; трофеи bound — уценка только при выкупе у бота."""
     spin_cost = int(cost if cost is not None else config.SHOP_WHEEL_COST)
     cd = int(config.SHOP_WHEEL_COOLDOWN_SEC)
     last = ensure_aware(player.last_wheel_at)
