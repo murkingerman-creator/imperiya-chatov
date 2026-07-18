@@ -22,8 +22,15 @@ from services.treasury import (
     TreasuryError,
     activate_shield,
     amnesty,
+    buy_shield_pool,
     contribute_shield,
+    feast,
+    fortify,
     payout,
+    raise_monument,
+    raid_fund,
+    scholarship,
+    treasury_catalog_text,
     war_levy,
     work_edict,
 )
@@ -57,11 +64,7 @@ def register(bot: Bot) -> None:
                 work = f"\n⚒ Указ о труде до {wu.strftime('%H:%M')} UTC"
             await reply(
                 message,
-                f"🏛 Казна {n.flag_emoji} {n.name}: {n.treasury}\n"
-                f"Фонд щита: {n.shield_pool}/{config.NATION_SHIELD_POOL_NEED}"
-                f"{shield}{work}\n\n"
-                f"Лидер/казначей тратит казну. Граждане вносят в щит по "
-                f"{config.NATION_SHIELD_CONTRIB} крон.",
+                treasury_catalog_text(n) + "\n\nГраждане: взнос в щит личными кронами.",
                 keyboard=treasury_keyboard().get_json(),
             )
 
@@ -99,6 +102,42 @@ def register(bot: Bot) -> None:
                     text = (
                         f"🛡 Взнос {r['cost']}. Фонд щита: "
                         f"{r['pool']}/{config.NATION_SHIELD_POOL_NEED}."
+                    )
+                elif action == "feast":
+                    r = await feast(session, player)
+                    text = (
+                        f"🎉 Праздник (−{r['cost']}): +энергия {r['boosted']} гражданам, "
+                        f"работы +10% на {r['hours']}ч."
+                    )
+                elif action == "fortify":
+                    r = await fortify(session, player)
+                    text = (
+                        f"🧱 Укрепление (−{r['cost']}): защита казны "
+                        f"+{r['defend_pct']}% на {r['hours']}ч."
+                    )
+                elif action == "scholar":
+                    r = await scholarship(session, player)
+                    text = (
+                        f"📚 Стипендия (−{r['cost']}): XP граждан ×{r['mult']} "
+                        f"на {r['hours']}ч."
+                    )
+                elif action == "raid_fund":
+                    r = await raid_fund(session, player)
+                    text = (
+                        f"⚔ Фонд рейда (−{r['cost']}): заряд ×{r['charges']}, "
+                        f"следующий рейд +{r['steal_pct']}% добычи."
+                    )
+                elif action == "buy_shield":
+                    r = await buy_shield_pool(session, player)
+                    text = (
+                        f"🛡 Из казны в фонд щита: −{r['cost']} → +{r['added']}. "
+                        f"Фонд: {r['pool']}/{config.NATION_SHIELD_POOL_NEED}."
+                    )
+                elif action == "monument":
+                    r = await raise_monument(session, player)
+                    text = (
+                        f"🗿 Монумент ур.{r['level']} (−{r['cost']})! "
+                        f"Постоянно +{r['work_pct']}% к работам страны."
                     )
                 else:
                     await reply(message, "Неизвестно.", keyboard=treasury_keyboard().get_json())

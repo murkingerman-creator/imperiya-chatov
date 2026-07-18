@@ -9,6 +9,7 @@ from services.achievements import format_titles
 from services.cataclysm import format_cataclysm, get_cataclysm
 from services.empire import format_empire_line, get_empire_status
 from services.inventory import discovered_count, get_equipped
+from services.levels import format_level_line, sync_level
 from services.player import (
     energy_next_in_minutes,
     ensure_aware,
@@ -35,6 +36,7 @@ def register(bot: Bot) -> None:
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             regenerate_energy(player)
+            sync_level(player)
             await session.commit()
             ev = await get_active_event(session)
             flash = await get_flash_event(session)
@@ -92,6 +94,7 @@ def register(bot: Bot) -> None:
 
             text = (
                 f"👤 {player.name}\n"
+                f"{format_level_line(player)}\n"
                 f"💰 Кроны: {player.crowns}\n"
                 f"⚡ Энергия: {player.energy}/{config.MAX_ENERGY} ({energy_hint})\n"
                 f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"

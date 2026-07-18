@@ -25,6 +25,14 @@ def register(bot: Bot) -> None:
 
             titles = await check_streak(session, player)
             title_line = f"\n🏅 {', '.join(titles)}" if titles else ""
+            from services.levels import add_xp
+
+            xp_info = await add_xp(session, player, config.XP_DAILY, reason="ежедневка")
+            xp_line = ""
+            if xp_info.get("level_ups"):
+                xp_line = "\n" + "\n".join(xp_info["level_ups"])
+            elif xp_info.get("gained"):
+                xp_line = f"\n⭐ +{xp_info['gained']} XP"
             onboard = await advance_onboarding(session, player, "daily")
             onboard_line = f"\n{onboard}" if onboard else ""
             text = (
@@ -32,7 +40,7 @@ def register(bot: Bot) -> None:
                 f"+{result['reward']} крон "
                 f"(база {result['base']} + стрик {result['bonus']})\n"
                 f"🔥 Стрик: {result['streak']} дн.\n"
-                f"💰 Баланс: {result['crowns']}{title_line}{onboard_line}"
+                f"💰 Баланс: {result['crowns']}{title_line}{xp_line}{onboard_line}"
             )
             await announce_nation(
                 message.ctx_api,

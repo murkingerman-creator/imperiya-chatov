@@ -37,6 +37,11 @@ def assert_not_jailed(player: Player) -> None:
 async def do_smuggle(session: AsyncSession, player: Player) -> dict:
     regenerate_energy(player)
     assert_not_jailed(player)
+    if int(player.level or 1) < int(config.SMUGGLE_LEVEL_REQ):
+        raise SmuggleError(
+            f"Контрабанда с {config.SMUGGLE_LEVEL_REQ} уровня "
+            f"(у тебя {int(player.level or 1)})."
+        )
     now = utcnow()
     last = ensure_aware(player.last_smuggle_at)
     if last:
@@ -103,6 +108,11 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
                 charge_notes.append(f"⚡ {name}: +300 в казну")
 
         await session.commit()
+        from services.levels import add_xp
+
+        xp_info = await add_xp(session, player, config.XP_SMUGGLE, reason="контрабанда")
+        if xp_info.get("level_ups"):
+            charge_notes.extend(xp_info["level_ups"])
         drop = await grant_drop(
             session,
             player,
@@ -138,6 +148,11 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
     fine = min(player.crowns, int(random.randint(30, 80) * loadout.smuggle_fine_mult))
     player.crowns -= fine
     await session.commit()
+    from services.levels import add_xp
+
+    xp_info = await add_xp(session, player, max(4, config.XP_SMUGGLE // 2), reason="контрабанда")
+    if xp_info.get("level_ups"):
+        charge_notes.extend(xp_info["level_ups"])
     drop = await grant_drop(
         session,
         player,

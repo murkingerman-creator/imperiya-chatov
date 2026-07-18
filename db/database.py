@@ -38,6 +38,8 @@ _PLAYER_COLS = {
     "saga_day": "INTEGER DEFAULT 0",
     "saga_claimed_day": "INTEGER DEFAULT 0",
     "last_protest_at": "DATETIME",
+    "xp": "INTEGER DEFAULT 0",
+    "level": "INTEGER DEFAULT 1",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",
@@ -66,6 +68,11 @@ _NATION_COLS = {
     "siege_attempts": "INTEGER DEFAULT 0",
     "siege_until": "DATETIME",
     "nation_relic": "VARCHAR(64) DEFAULT ''",
+    "monument_level": "INTEGER DEFAULT 0",
+    "feast_until": "DATETIME",
+    "fortify_until": "DATETIME",
+    "xp_buff_until": "DATETIME",
+    "raid_fund": "INTEGER DEFAULT 0",
 }
 _EQUIPPED_COLS = {
     "upgrade": "INTEGER DEFAULT 0",

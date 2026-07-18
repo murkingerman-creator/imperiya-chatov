@@ -227,6 +227,12 @@ async def raid(
             float(def_loadout.raid_defend or 0.0)
             + float(def_loadout.nation_treasury_raid_defend or 0.0)
         )
+    fort_until = ensure_aware(defender.fortify_until)
+    if fort_until and fort_until > now:
+        defend_stat += float(config.TREASURY_FORTIFY_DEFEND)
+        charge_notes.append(
+            f"🧱 Укрепление цели: +{int(config.TREASURY_FORTIFY_DEFEND * 100)}% защиты"
+        )
 
     atk_pwr = attack_force(effective_atk, atk_mult)
     def_pwr = defense_force(def_manpower["effective"], defend_stat)
@@ -279,8 +285,10 @@ async def raid(
 
     if not success_roll:
         from services.discontent import on_raid_fail
+        from services.levels import add_xp
 
         await on_raid_fail(session, attacker)
+        await add_xp(session, leader, config.XP_RAID_FAIL, reason="рейд")
         await add_points(session, defender.id, config.SEASON_RAID_DEFEND)
         await session.commit()
         return {
@@ -315,6 +323,12 @@ async def raid(
     cata = await get_cataclysm(session)
     stolen = int(stolen * cataclysm_raid_mult(cata))
     stolen = int(stolen * float(siege_info.get("steal_mult") or 1.0))
+    if int(attacker.raid_fund or 0) > 0:
+        stolen = int(stolen * (1.0 + float(config.TREASURY_RAID_FUND_STEAL)))
+        attacker.raid_fund -= 1
+        charge_notes.append(
+            f"⚔ Фонд рейда: +{int(config.TREASURY_RAID_FUND_STEAL * 100)}% добычи"
+        )
     stolen, _ = apply_raid_modifiers(stolen, loadout)
 
     # доп. срез добычи экипом защиты (поверх уже учтённой силы в шансе)
@@ -367,6 +381,11 @@ async def raid(
 
     titles = await check_after_raid(session, leader)
     titles += await check_treasury(session, leader)
+    from services.levels import add_xp
+
+    xp_info = await add_xp(session, leader, config.XP_RAID_WIN, reason="рейд")
+    if xp_info.get("level_ups"):
+        charge_notes.extend(xp_info["level_ups"])
     trophy = await maybe_create_trophy(session, attacker)
 
     score_pts = 1

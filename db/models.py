@@ -54,6 +54,11 @@ class Nation(Base):
     )
     # реликвия нации (aura key)
     nation_relic: Mapped[str] = mapped_column(String(64), default="")
+    monument_level: Mapped[int] = mapped_column(Integer, default=0)
+    feast_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fortify_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    xp_buff_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    raid_fund: Mapped[int] = mapped_column(Integer, default=0)  # заряды на следующий рейд
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -103,6 +108,8 @@ class Player(Base):
     last_protest_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    xp: Mapped[int] = mapped_column(Integer, default=0)
+    level: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

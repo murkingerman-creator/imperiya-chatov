@@ -314,21 +314,42 @@ def admin_extra_keyboard() -> Keyboard:
     return kb
 
 
-def jobs_keyboard() -> Keyboard:
+def jobs_keyboard(level: int = 1) -> Keyboard:
     kb = Keyboard(one_time=False, inline=False)
-    kb.add(Text("⛏ Шахта", {"cmd": "job", "job": "mine"}), color=KeyboardButtonColor.PRIMARY)
-    kb.add(Text("🛒 Рынок", {"cmd": "job", "job": "market"}), color=KeyboardButtonColor.POSITIVE)
+    level = max(1, int(level or 1))
+
+    def _job(label: str, job: str, color):
+        req = config.JOB_LEVEL_REQ.get(job, 1)
+        if level >= req:
+            kb.add(Text(label, {"cmd": "job", "job": job}), color=color)
+        else:
+            kb.add(
+                Text(f"🔒{req} {label}", {"cmd": "job_locked", "job": job, "req": req}),
+                color=KeyboardButtonColor.SECONDARY,
+            )
+
+    _job("⛏ Шахта", "mine", KeyboardButtonColor.PRIMARY)
+    _job("🛒 Рынок", "market", KeyboardButtonColor.POSITIVE)
     kb.row()
-    kb.add(Text("🎣 Рыбалка", {"cmd": "job", "job": "fish"}), color=KeyboardButtonColor.PRIMARY)
-    kb.add(Text("🌾 Поле", {"cmd": "job", "job": "farm"}), color=KeyboardButtonColor.POSITIVE)
+    _job("🎣 Рыбалка", "fish", KeyboardButtonColor.PRIMARY)
+    _job("🌾 Поле", "farm", KeyboardButtonColor.POSITIVE)
     kb.row()
-    kb.add(Text("🔥 Кузня", {"cmd": "job", "job": "forge"}), color=KeyboardButtonColor.PRIMARY)
-    kb.add(Text("🍺 Таверна", {"cmd": "job", "job": "tavern"}), color=KeyboardButtonColor.POSITIVE)
+    _job("🔥 Кузня", "forge", KeyboardButtonColor.PRIMARY)
+    _job("🍺 Таверна", "tavern", KeyboardButtonColor.POSITIVE)
     kb.row()
-    kb.add(Text("🛡 Охрана", {"cmd": "job", "job": "guard"}), color=KeyboardButtonColor.NEGATIVE)
-    kb.add(Text("🕶 Контрабанда", {"cmd": "smuggle"}), color=KeyboardButtonColor.NEGATIVE)
+    _job("🛡 Охрана", "guard", KeyboardButtonColor.NEGATIVE)
+    if level >= config.SMUGGLE_LEVEL_REQ:
+        kb.add(Text("🕶 Контрабанда", {"cmd": "smuggle"}), color=KeyboardButtonColor.NEGATIVE)
+    else:
+        kb.add(
+            Text(
+                f"🔒{config.SMUGGLE_LEVEL_REQ} Контрабанда",
+                {"cmd": "job_locked", "job": "smuggle"},
+            ),
+            color=KeyboardButtonColor.SECONDARY,
+        )
     kb.row()
-    kb.add(Text("🔓 Выкуп", {"cmd": "shop_buy", "item": "bail"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("⭐ Уровни", {"cmd": "levels"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
@@ -399,7 +420,16 @@ def treasury_keyboard() -> Keyboard:
     kb.add(Text("💰 Раздача", {"cmd": "tr_spend", "action": "payout"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("🕊 Амнистия", {"cmd": "tr_spend", "action": "amnesty"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
-    kb.add(Text("🛡 Взнос щит", {"cmd": "tr_spend", "action": "shield_pay"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🎉 Праздник", {"cmd": "tr_spend", "action": "feast"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🧱 Укрепление", {"cmd": "tr_spend", "action": "fortify"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("📚 Стипендия", {"cmd": "tr_spend", "action": "scholar"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("⚔ Фонд рейда", {"cmd": "tr_spend", "action": "raid_fund"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text("🛡 Казна→щит", {"cmd": "tr_spend", "action": "buy_shield"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🗿 Монумент", {"cmd": "tr_spend", "action": "monument"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("🛡 Взнос щит", {"cmd": "tr_spend", "action": "shield_pay"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text("🛡 Активировать", {"cmd": "tr_spend", "action": "shield_on"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text("🏛 Страна", {"cmd": "nation"}), color=KeyboardButtonColor.SECONDARY)

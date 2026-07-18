@@ -42,6 +42,21 @@ async def get_or_create_player(
         # написал боту → ЛС снова доступны
         if not player.dm_ok:
             player.dm_ok = True
+        # уровни: ветераны без XP получают стартовый буст один раз
+        if int(player.xp or 0) == 0 and int(player.level or 1) <= 1:
+            boost = 0
+            boost += int(player.raid_wins or 0) * 20
+            boost += int(player.quest_claimed or 0) * 25
+            boost += min(200, max(0, (player.crowns or 0) // 20))
+            if boost > 0:
+                player.xp = boost
+            from services.levels import sync_level
+
+            sync_level(player)
+        else:
+            from services.levels import sync_level
+
+            sync_level(player)
         regenerate_energy(player)
         return player
 
@@ -55,6 +70,8 @@ async def get_or_create_player(
         daily_streak=0,
         onboarding_step=1,
         dm_ok=True,
+        xp=0,
+        level=1,
     )
     session.add(player)
     await session.commit()

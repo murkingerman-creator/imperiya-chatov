@@ -47,6 +47,14 @@ def _job_last_attr(job: str) -> str:
 def check_can_start_job(player: Player, job: str, *, skip_cd: bool = False) -> dict:
     if job not in config.JOBS:
         raise WorkError("Неизвестная работа.")
+    from services.levels import job_unlocked
+
+    if not job_unlocked(player, job):
+        req = config.JOB_LEVEL_REQ.get(job, 1)
+        raise WorkError(
+            f"{config.JOBS[job]['title']} откроется с {req} уровня "
+            f"(у тебя {int(player.level or 1)})."
+        )
     regenerate_energy(player)
     until = ensure_aware(player.jail_until)
     if until and utcnow() < until:
@@ -257,6 +265,11 @@ async def finish_minigame(
         gross = max(1, int(gross * (1.0 + market_b)))
         charge_notes.append(f"🛒 Рынок столицы: +{int(market_b * 100)}%")
 
+    if player.nation and int(player.nation.monument_level or 0) > 0:
+        mon = int(player.nation.monument_level) * float(config.TREASURY_MONUMENT_WORK)
+        gross = max(1, int(gross * (1.0 + mon)))
+        charge_notes.append(f"🗿 Монумент ур.{player.nation.monument_level}: +{int(mon*100)}%")
+
     relic_w, _ = relic_bonuses(player.nation if player.nation_id else None)
     if relic_w:
         gross = max(1, int(gross * (1.0 + relic_w)))
@@ -351,6 +364,14 @@ async def finish_minigame(
     contract_note = await on_job_for_contracts(session, player, game.job)
     if contract_note:
         charge_notes.append(contract_note)
+
+    from services.levels import add_xp
+
+    xp_info = await add_xp(session, player, config.XP_JOB, reason="работа")
+    if xp_info.get("level_ups"):
+        charge_notes.extend(xp_info["level_ups"])
+    elif xp_info.get("gained"):
+        charge_notes.append(f"⭐ +{xp_info['gained']} XP")
 
     drop_pool = spec.get("loot_pool") or game.job
     if cata and cata.get("loot_pool"):

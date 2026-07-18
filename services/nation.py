@@ -55,6 +55,11 @@ def format_nation_card(
             f"🕯 Реликвия нации: +{int(config.NATION_RELIC_WORK * 100)}% работы, "
             f"+{int(config.NATION_RELIC_RAID * 100)}% рейд"
         )
+    mon = int(nation.monument_level or 0)
+    if mon:
+        lines.append(
+            f"🗿 Монумент ур.{mon}: +{int(mon * config.TREASURY_MONUMENT_WORK * 100)}% работы"
+        )
     if ally_line:
         lines.append(ally_line)
     return "\n".join(lines)

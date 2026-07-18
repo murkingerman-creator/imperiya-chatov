@@ -8,6 +8,7 @@ from handlers.rules import match_cmd, payload_cmd
 from services.announce import announce_nation
 from services.economy import WorkError, finish_minigame, start_minigame
 from services.item_effects import get_loadout
+from services.levels import format_level_line, jobs_unlock_help, sync_level
 from services.onboarding import advance_onboarding, onboarding_prompt
 from services.player import get_or_create_player
 
@@ -15,15 +16,54 @@ from services.player import get_or_create_player
 def register(bot: Bot) -> None:
     @bot.on.message(func=match_cmd("jobs", "работа", "💼 работа", "работы"))
     async def jobs_menu(message: Message):
-        await reply(message, 
-            "💼 Работы (у каждой свой КД и мини-игра):\n"
-            "🍺 Таверна ~10м · 🎣 Рыбалка ~12м · 🌾 Поле ~16м\n"
-            "🛒 Рынок ~18м · 🔥 Кузня ~28м · ⛏ Шахта ~35м\n"
-            "🛡 Охрана ~40м (+казне) · 🕶 Контрабанда ~35м (риск)\n"
-            f"⚡ Энергия до {config.MAX_ENERGY}, реген быстрее.\n"
-            "Лут → 🎒 Сумка.",
-            keyboard=jobs_keyboard().get_json(),
-        )
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            sync_level(player)
+            await session.commit()
+            await reply(
+                message,
+                "💼 Работы открываются с уровнем.\n"
+                f"{format_level_line(player)}\n"
+                "🍺 Таверна / 🎣 Рыбалка — с 1 ур.\n"
+                "🔒 = нужен уровень. Кнопка «⭐ Уровни» — полный список.\n"
+                f"⚡ Энергия до {config.MAX_ENERGY}. Лут → 🎒 Сумка.",
+                keyboard=jobs_keyboard(player.level or 1).get_json(),
+            )
+
+    @bot.on.message(func=match_cmd("levels", "уровень", "⭐ уровни", "ур"))
+    async def levels_menu(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            sync_level(player)
+            await session.commit()
+            await reply(
+                message,
+                f"{format_level_line(player)}\n\n{jobs_unlock_help(player)}\n\n"
+                "XP: работы, ежедневка, рейды, контрабанда, квесты, сага.",
+                keyboard=jobs_keyboard(player.level or 1).get_json(),
+            )
+
+    @bot.on.message(func=payload_cmd("job_locked"))
+    async def job_locked(message: Message):
+        payload = message.get_payload_json() or {}
+        req = int(payload.get("req") or 0)
+        job = str(payload.get("job") or "")
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            title = config.JOBS.get(job, {}).get("title", job)
+            if job == "smuggle":
+                title = "🕶 Контрабанда"
+                req = config.SMUGGLE_LEVEL_REQ
+            await reply(
+                message,
+                f"🔒 {title} откроется с {req} уровня "
+                f"(сейчас {int(player.level or 1)}).\n"
+                f"{format_level_line(player)}",
+                keyboard=jobs_keyboard(player.level or 1).get_json(),
+            )
 
     @bot.on.message(func=payload_cmd("job"))
     async def job_start(message: Message):
@@ -43,13 +83,18 @@ def register(bot: Bot) -> None:
                     player, job, skip_cd=skip_cd, charge_flags=flags
                 )
             except WorkError as e:
-                await reply(message, e.message, keyboard=jobs_keyboard().get_json())
+                await reply(
+                    message,
+                    e.message,
+                    keyboard=jobs_keyboard(player.level or 1).get_json(),
+                )
                 return
 
             prompt = game["prompt"]
             if flags.get("free_mine"):
                 prompt += "\n⚡ Заряд: шахта без КД ×2"
-            await reply(message, 
+            await reply(
+                message,
                 prompt,
                 keyboard=minigame_keyboard(game["token"], game["buttons"]).get_json(),
             )
@@ -65,7 +110,7 @@ def register(bot: Bot) -> None:
             try:
                 result = await finish_minigame(session, player, token, answer)
             except WorkError as e:
-                await reply(message, e.message, keyboard=jobs_keyboard().get_json())
+                await reply(message, e.message, keyboard=jobs_keyboard(player.level or 1).get_json())
                 return
 
             status = "Успех!" if result["success"] else "Провал…"
