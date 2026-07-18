@@ -61,7 +61,9 @@ def more_keyboard() -> Keyboard:
     kb.add(Text("📅 Цель недели", {"cmd": "weekly"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("💰 Топ игроков", {"cmd": "top_players"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
+    kb.add(Text("💡 Предложение", {"cmd": "suggest"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("📖 Как играть", {"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -224,6 +226,8 @@ def admin_keyboard() -> Keyboard:
     kb.add(Text("✉️ В ЛС", {"cmd": "adm_bcast_dms"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
     kb.add(Text("📣✉️ Везде", {"cmd": "adm_bcast_all"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("💡 Предложения", {"cmd": "adm_suggestions"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 

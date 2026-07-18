@@ -12,6 +12,7 @@ from handlers import (
     profile,
     shop,
     start,
+    suggestions,
     tops,
     war,
     work,
@@ -33,6 +34,7 @@ def register_all(bot) -> None:
     inventory.register(bot)
     market.register(bot)
     shop.register(bot)
+    suggestions.register(bot)
     nation.register(bot)
     nation_extra.register(bot)
 

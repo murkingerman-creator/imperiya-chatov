@@ -11,6 +11,14 @@ from services.broadcast import broadcast, format_report
 from services.chronicle import force_post_chronicle
 from services.nation import NationError, dissolve_nation_by_name
 from services.player import get_or_create_player
+from services.suggestions import (
+    SuggestionError,
+    accept_suggestion,
+    format_suggestions_list,
+    list_pending,
+    reject_suggestion,
+)
+import random
 
 # peer_id + from_id -> mode
 _pending: dict[tuple[int, int], str] = {}
@@ -51,7 +59,9 @@ def register(bot: Bot) -> None:
             "• !удалитьстрану Название\n"
             "• !объявление текст — во все беседы+ЛС\n"
             "• !объявление_беседы текст\n"
-            "• !объявление_лс текст\n",
+            "• !объявление_лс текст\n"
+            "• !принять ID — принять предложение\n"
+            "• !отклонить ID [причина]\n",
             keyboard=admin_keyboard().get_json(),
         )
 
@@ -130,6 +140,18 @@ def register(bot: Bot) -> None:
             "Напиши текст объявления одним сообщением (или «отмена»).",
             keyboard=cancel_keyboard().get_json(),
         )
+
+    @bot.on.message(func=payload_cmd("adm_suggestions"))
+    async def adm_suggestions(message: Message):
+        if not await _require(message):
+            return
+        async with SessionLocal() as session:
+            items = await list_pending(session)
+            await reply(
+                message,
+                format_suggestions_list(items),
+                keyboard=admin_keyboard().get_json(),
+            )
 
     @bot.on.message(func=payload_cmd("adm_give"))
     async def adm_give_ask(message: Message):
@@ -233,6 +255,29 @@ def register(bot: Bot) -> None:
         if lower.startswith("!объявление_лс "):
             body = text.split(maxsplit=1)[1].strip()
             await _do_broadcast(message, body, to_chats=False, to_dms=True)
+            return
+        if lower.startswith("!принять ") or lower.startswith("!accept "):
+            parts = text.split(maxsplit=1)
+            if len(parts) >= 2 and parts[1].strip().split()[0].isdigit():
+                await _do_accept(message, int(parts[1].strip().split()[0]))
+            else:
+                await reply(
+                    message,
+                    "Формат: !принять ID",
+                    keyboard=admin_keyboard().get_json(),
+                )
+            return
+        if lower.startswith("!отклонить ") or lower.startswith("!reject "):
+            parts = text.split(maxsplit=2)
+            if len(parts) >= 2 and parts[1].isdigit():
+                note = parts[2] if len(parts) >= 3 else ""
+                await _do_reject(message, int(parts[1]), note)
+            else:
+                await reply(
+                    message,
+                    "Формат: !отклонить ID [причина]",
+                    keyboard=admin_keyboard().get_json(),
+                )
             return
 
         key = (message.peer_id, message.from_id)
@@ -360,3 +405,76 @@ async def _do_del_nation(message: Message, name: str) -> None:
             f"🗑 Удалена страна {deleted}",
             keyboard=admin_keyboard().get_json(),
         )
+
+
+async def _notify_author(message: Message, user_id: int, text: str) -> bool:
+    try:
+        await message.ctx_api.messages.send(
+            user_id=user_id,
+            message=text,
+            random_id=random.randint(1, 2_000_000_000),
+        )
+        return True
+    except Exception:
+        return False
+
+
+async def _do_accept(message: Message, sug_id: int) -> None:
+    if not await _require(message):
+        return
+    async with SessionLocal() as session:
+        try:
+            result = await accept_suggestion(session, sug_id)
+        except SuggestionError as e:
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
+            return
+        sug = result["suggestion"]
+        reward = result["reward"]
+        author_id = sug.author_vk_id
+        author_name = sug.author_name
+        body = sug.text
+        crowns = result["crowns"]
+
+    dm = (
+        f"✅ Твоё предложение #{sug_id} принято!\n\n"
+        f"«{body}»\n\n"
+        f"Награда: +{reward} крон"
+        + (f" (баланс {crowns})." if crowns is not None else ".")
+        + "\nСпасибо — идея пойдёт в работу."
+    )
+    dm_ok = await _notify_author(message, author_id, dm)
+    await reply(
+        message,
+        f"✅ #{sug_id} принято · {author_name}\n"
+        f"+{reward} крон автору"
+        + (" · ЛС отправлено" if dm_ok else " · ЛС не доставлено (закрыты)"),
+        keyboard=admin_keyboard().get_json(),
+    )
+
+
+async def _do_reject(message: Message, sug_id: int, note: str = "") -> None:
+    if not await _require(message):
+        return
+    async with SessionLocal() as session:
+        try:
+            result = await reject_suggestion(session, sug_id, note)
+        except SuggestionError as e:
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
+            return
+        sug = result["suggestion"]
+        author_id = sug.author_vk_id
+        author_name = sug.author_name
+        body = sug.text
+        reason = (note or "").strip()
+
+    dm = f"❌ Твоё предложение #{sug_id} отклонено.\n\n«{body}»"
+    if reason:
+        dm += f"\n\nПричина: {reason}"
+    dm_ok = await _notify_author(message, author_id, dm)
+    await reply(
+        message,
+        f"❌ #{sug_id} отклонено · {author_name}"
+        + (f"\nПричина: {reason}" if reason else "")
+        + (" · ЛС отправлено" if dm_ok else " · ЛС не доставлено"),
+        keyboard=admin_keyboard().get_json(),
+    )
