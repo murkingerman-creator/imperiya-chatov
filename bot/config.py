@@ -113,6 +113,16 @@ JOBS = {
     },
 }
 
+# Ранги профессий (пороги счётчика работ)
+JOB_RANK_THRESHOLDS = (0, 8, 25, 60, 120)
+JOB_RANK_NAMES = ("новичок", "ученик", "подмастерье", "мастер", "легенда")
+JOB_RANK_BONUS = 0.04  # +4% дохода за ранг (к этой работе)
+
+# Караван страны: N работ граждан за окно → казна
+CARAVAN_NEED = 5
+CARAVAN_WINDOW_MIN = 60
+CARAVAN_TREASURY = 80
+
 # Nation
 NATION_SWITCH_COOLDOWN_HOURS = 24
 CUSTOMIZE_COOLDOWN_HOURS = 6

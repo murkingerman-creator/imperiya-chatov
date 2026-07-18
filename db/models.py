@@ -59,6 +59,10 @@ class Nation(Base):
     fortify_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     xp_buff_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     raid_fund: Mapped[int] = mapped_column(Integer, default=0)  # заряды на следующий рейд
+    caravan_progress: Mapped[int] = mapped_column(Integer, default=0)
+    caravan_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -113,6 +117,8 @@ class Player(Base):
     last_wheel_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # mine=12,fish=3 — счётчики для рангов профессий
+    job_counts: Mapped[str] = mapped_column(String(512), default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

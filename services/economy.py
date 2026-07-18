@@ -79,65 +79,94 @@ def check_can_start_job(player: Player, job: str, *, skip_cd: bool = False) -> d
 
 
 def _build_minigame(job: str) -> tuple[str, str, list[tuple[str, str]], dict]:
-    """prompt, correct, buttons, meta"""
+    """prompt, correct, buttons, meta — у каждой работы свой паттерн."""
+    now = utcnow().timestamp()
+
     if job == "mine":
-        correct = random.choice(["A", "B", "C"])
+        # риск: осторожно = стабильно; глубже = джекпот или обвал
         return (
-            "⛏ Шахта: в какой штольне руда?\nВыбери A / B / C.",
-            correct,
-            [("Штольня A", "A"), ("Штольня B", "B"), ("Штольня C", "C")],
-            {},
+            "⛏ Шахта: жила манит вглубь.\n"
+            "Осторожно — меньше, но верно.\n"
+            "Глубже — ×2 или обвал.",
+            "choice",
+            [("🛡 Осторожно", "careful"), ("💥 Глубже!", "deep")],
+            {"mode": "risk"},
         )
+
     if job == "market":
-        rate = random.randint(40, 80)
-        correct = random.choice(["up", "down"])
+        buy = random.randint(25, 55)
         return (
-            f"🛒 Рынок: курс сейчас {rate}.\nКуда пойдёт цена?",
-            correct,
-            [("📈 Выше", "up"), ("📉 Ниже", "down")],
-            {"rate": rate},
+            f"🛒 Рынок: лот за {buy} крон (оценка).\n"
+            f"Покупаешь или пропускаешь?",
+            "buy",  # не равенство — mode=market
+            [("✅ Купить", "buy"), ("⏭ Пропустить", "skip")],
+            {"mode": "market", "step": 1, "buy_price": buy},
         )
+
     if job == "guard":
-        faces = ["🙂", "😎", "🥸"]
+        faces = ["🙂", "😎", "🥸", "😐"]
+        random.shuffle(faces)
         spy_idx = random.randint(0, 2)
+        shown = "  ".join(f"{i + 1}){faces[i]}" for i in range(3))
         return (
-            f"🛡 Охрана: кто шпион?\n1) {faces[0]}  2) {faces[1]}  3) {faces[2]}",
+            f"🛡 Охрана: запомни шпиона!\n{shown}\n"
+            f"Кто лишний? (смотри внимательно)",
             str(spy_idx),
-            [(f"1 {faces[0]}", "0"), (f"2 {faces[1]}", "1"), (f"3 {faces[2]}", "2")],
-            {"faces": faces},
+            [(f"{i + 1} {faces[i]}", str(i)) for i in range(3)],
+            {"mode": "memory", "faces": faces},
         )
+
     if job == "fish":
-        correct = random.choice(["left", "right", "deep"])
+        delay = random.uniform(1.8, 4.5)
+        bite_at = now + delay
         return (
-            "🎣 Рыбалка: где клюёт?\nВыбери место.",
-            correct,
-            [("⬅ Слева", "left"), ("➡ Справа", "right"), ("⬇ Глубже", "deep")],
-            {},
+            "🎣 Рыбалка: вода спокойна…\n"
+            "Не торопись — подожди пару секунд,\n"
+            "потом жми «Подсечь». Рано / поздно — мимо.",
+            "hook",
+            [("🎣 Подсечь", "hook")],
+            {"mode": "timing", "bite_at": bite_at, "window": 10.0},
         )
+
     if job == "farm":
-        correct = random.choice(["water", "weed", "harvest"])
+        # погода дня (стабильна в пределах часа)
+        hour_seed = int(utcnow().timestamp() // 3600)
+        weather = ["drought", "rain", "ripe"][hour_seed % 3]
+        labels = {
+            "drought": "🔥 Засуха — полей",
+            "rain": "🌧 Дождь — пропали сорняки? Прополи",
+            "ripe": "☀️ Всё зрело — собирай",
+        }
+        correct = {"drought": "water", "rain": "weed", "ripe": "harvest"}[weather]
         return (
-            "🌾 Поле: что сделать сейчас?",
+            f"🌾 Поле сегодня: {labels[weather]}\nЧто делать?",
             correct,
             [("💧 Полить", "water"), ("🌿 Прополоть", "weed"), ("🧺 Собрать", "harvest")],
-            {},
+            {"mode": "weather", "weather": weather},
         )
+
     if job == "forge":
-        correct = random.choice(["soft", "hard", "quench"])
+        steps = random.sample(["soft", "hard", "quench"], 3)
+        labels = {"soft": "🔨 Легко", "hard": "⚔ Сильно", "quench": "❄ Закалить"}
+        preview = " → ".join(labels[s] for s in steps)
         return (
-            "🔥 Кузня: ударь правильно!",
-            correct,
-            [("🔨 Легко", "soft"), ("⚔ Сильно", "hard"), ("❄ Закалить", "quench")],
-            {},
+            f"🔥 Кузня: повтори ритм!\n{preview}\n"
+            f"Шаг 1/{len(steps)} — первый удар:",
+            steps[0],
+            [(labels[k], k) for k in ("soft", "hard", "quench")],
+            {"mode": "chain", "steps": steps, "idx": 0, "labels": labels},
         )
+
     if job == "tavern":
-        correct = random.choice(["ale", "song", "deal"])
+        # выбор без провала — разные награды
         return (
-            "🍺 Таверна: чем заработать чаевые?",
-            correct,
+            "🍺 Таверна: чем берёшь зал?\n"
+            "Эль — стабильно · Песня — риск чаевых · Сделка — жирно/пусто",
+            "choice",
             [("🍺 Эль", "ale"), ("🎵 Песня", "song"), ("🃏 Сделка", "deal")],
-            {},
+            {"mode": "tavern"},
         )
+
     raise WorkError("Неизвестная работа.")
 
 
@@ -149,6 +178,7 @@ def start_minigame(
     now_ts = utcnow().timestamp()
     prompt, correct, buttons, meta = _build_minigame(job)
     meta.update(charge_flags or {})
+    ttl = 90 if meta.get("mode") in ("chain", "market", "timing") else 60
 
     for k, s in list(_sessions.items()):
         if s.vk_id == player.vk_id or s.expires_at < now_ts:
@@ -159,10 +189,164 @@ def start_minigame(
         job=job,
         token=token,
         correct=correct,
-        expires_at=now_ts + 60,
+        expires_at=now_ts + ttl,
         meta=meta,
     )
     return {"token": token, "prompt": prompt, "buttons": buttons, "job": job}
+
+
+def _resolve_answer(game: MiniSession, answer: str) -> dict:
+    """Разбор ответа. continue=True — ещё шаг; иначе success + множители."""
+    mode = game.meta.get("mode") or "simple"
+    now = utcnow().timestamp()
+
+    if mode == "timing":
+        bite = float(game.meta.get("bite_at") or 0)
+        window = float(game.meta.get("window") or 7)
+        if answer != "hook":
+            return {"success": False, "note": "Не та кнопка."}
+        if now < bite:
+            return {"success": False, "note": "Рано — рыба ушла."}
+        if now > bite + window:
+            return {"success": False, "note": "Поздно — сорвалась."}
+        return {"success": True, "note": "Есть!"}
+
+    if mode == "risk":
+        if answer == "careful":
+            return {
+                "success": True,
+                "reward_mult": 0.85,
+                "note": "Осторожная добыча.",
+            }
+        if answer == "deep":
+            if random.random() < 0.48:
+                return {
+                    "success": True,
+                    "reward_mult": 1.85,
+                    "note": "Жила! Глубина окупилась.",
+                }
+            return {
+                "success": False,
+                "reward_mult": 0.25,
+                "note": "Обвал. Еле выбрался.",
+            }
+        return {"success": False, "note": "Замер в штольне."}
+
+    if mode == "tavern":
+        if answer == "ale":
+            return {
+                "success": True,
+                "reward_mult": 1.0,
+                "note": "Эль и чаевые — ровно.",
+            }
+        if answer == "song":
+            if random.random() < 0.55:
+                return {
+                    "success": True,
+                    "reward_mult": 1.45,
+                    "note": "Зал ревел — чаевые жирные.",
+                }
+            return {
+                "success": True,
+                "reward_mult": 0.7,
+                "note": "Спел мимо ноты. Кинули мелочью.",
+            }
+        if answer == "deal":
+            if random.random() < 0.4:
+                return {
+                    "success": True,
+                    "reward_mult": 1.9,
+                    "note": "Тёмная сделка — карман тяжёлый.",
+                }
+            return {
+                "success": True,
+                "reward_mult": 0.45,
+                "note": "Обманули за карточным столом.",
+            }
+        return {"success": True, "reward_mult": 0.8, "note": "Смена как смена."}
+
+    if mode == "chain":
+        steps = list(game.meta.get("steps") or [])
+        idx = int(game.meta.get("idx") or 0)
+        labels = game.meta.get("labels") or {}
+        if idx >= len(steps) or answer != steps[idx]:
+            return {"success": False, "note": "Ритм сбит — металл остыл."}
+        idx += 1
+        game.meta["idx"] = idx
+        if idx < len(steps):
+            game.correct = steps[idx]
+            nxt = labels.get(steps[idx], steps[idx])
+            return {
+                "continue": True,
+                "prompt": (
+                    f"🔥 Верно! Шаг {idx + 1}/{len(steps)} — {nxt}"
+                ),
+                "buttons": [
+                    (labels.get(k, k), k) for k in ("soft", "hard", "quench")
+                ],
+            }
+        return {"success": True, "note": "Клинок закалён. Ритм идеален."}
+
+    if mode == "market":
+        step = int(game.meta.get("step") or 1)
+        if step == 1:
+            if answer == "skip":
+                return {
+                    "success": True,
+                    "reward_mult": 0.75,
+                    "note": "Пропустил лот — мелочь с соседнего прилавка.",
+                }
+            if answer != "buy":
+                return {"success": False, "note": "Растерялся у прилавка."}
+            buy = int(game.meta.get("buy_price") or 40)
+            move = random.randint(-18, 22)
+            sell = max(10, buy + move)
+            game.meta["step"] = 2
+            game.meta["sell_price"] = sell
+            game.correct = "sell"
+            return {
+                "continue": True,
+                "prompt": (
+                    f"🛒 Купил за {buy}. Курс ушёл: теперь {sell}.\n"
+                    f"Продаёшь или ждёшь отскока?"
+                ),
+                "buttons": [("💰 Продать", "sell"), ("⏳ Ждать", "wait")],
+            }
+        buy = int(game.meta.get("buy_price") or 40)
+        sell = int(game.meta.get("sell_price") or buy)
+        if answer == "sell":
+            if sell >= buy:
+                return {
+                    "success": True,
+                    "reward_mult": 1.0 + min(0.6, (sell - buy) / max(buy, 1)),
+                    "note": f"Продал с плюсом ({buy}→{sell}).",
+                }
+            return {
+                "success": True,
+                "reward_mult": 0.55,
+                "note": f"Продал в минус ({buy}→{sell}).",
+            }
+        if answer == "wait":
+            rebound = sell + random.randint(-8, 20)
+            if rebound > sell:
+                return {
+                    "success": True,
+                    "reward_mult": 1.25,
+                    "note": f"Отскок! Выждал {rebound}.",
+                }
+            return {
+                "success": True,
+                "reward_mult": 0.5,
+                "note": "Ждал зря — цена просела ещё.",
+            }
+        return {"success": False, "note": "Упустил момент."}
+
+    # simple / memory / weather
+    ok = answer == game.correct
+    return {
+        "success": ok,
+        "note": "Верно." if ok else "Мимо.",
+    }
 
 
 async def finish_minigame(
@@ -186,18 +370,35 @@ async def finish_minigame(
         work_multiplier,
     )
 
-    game = _sessions.pop(token, None)
+    game = _sessions.get(token)
     if not game or game.vk_id != player.vk_id:
+        _sessions.pop(token, None)
         raise WorkError("Мини-игра не найдена или устарела. Начни работу заново.")
     if utcnow().timestamp() > game.expires_at:
+        _sessions.pop(token, None)
         raise WorkError("Время вышло. Попробуй работу снова.")
+
+    resolved = _resolve_answer(game, answer)
+    if resolved.get("continue"):
+        # сессию оставляем
+        return {
+            "continue": True,
+            "token": token,
+            "prompt": resolved["prompt"],
+            "buttons": resolved["buttons"],
+            "job": game.job,
+        }
+
+    _sessions.pop(token, None)
 
     skip_cd = bool(game.meta.get("free_mine"))
     spec = check_can_start_job(player, game.job, skip_cd=skip_cd)
-    success = answer == game.correct
+    success = bool(resolved.get("success"))
     loadout = await get_loadout(session, player)
 
     charge_notes: list[str] = []
+    if resolved.get("note"):
+        charge_notes.append(str(resolved["note"]))
     free_mine_ok = False
 
     # free mine charge consume
@@ -218,7 +419,14 @@ async def finish_minigame(
             buff = await get_buff(session, player.vk_id, "no_tax_3")
 
     base = random.randint(spec["reward_min"], spec["reward_max"])
-    mult = spec["success_mult"] if success else spec["fail_mult"]
+    if resolved.get("reward_mult") is not None:
+        if success:
+            mult = float(spec["success_mult"]) * float(resolved["reward_mult"])
+        else:
+            mult = float(spec["fail_mult"]) * float(resolved["reward_mult"])
+    else:
+        mult = spec["success_mult"] if success else spec["fail_mult"]
+
     ev = await get_active_event(session)
     flash = await get_flash_event(session)
     event_key = ev["key"] if ev else None
@@ -231,7 +439,6 @@ async def finish_minigame(
     if ev and ev.get("key") == "plague" and "ignore_plague" in loadout.charges_ready:
         name = await try_consume_charge(session, player, "ignore_plague", loadout)
         if name:
-            # сбрасываем только эффект чумы, вспышка остаётся
             work_ev_mult = work_multiplier(None, flash)
             charge_notes.append(f"⚡ {name}: чума не действует")
     if flash:
@@ -253,6 +460,13 @@ async def finish_minigame(
     from services.districts import market_work_bonus, temple_luck_bonus
     from services.empire import get_empire_status
     from services.trophies import relic_bonuses
+    from services.professions import bump_job, work_bonus_for
+    from content.job_flavor import pick_flavor
+
+    prof_b = work_bonus_for(player, game.job)
+    if prof_b:
+        gross = max(1, int(gross * (1.0 + prof_b)))
+        charge_notes.append(f"🏅 Ранг профессии: +{int(prof_b * 100)}%")
 
     cata = await get_cataclysm(session)
     cata_w = cataclysm_work_mult(cata)
@@ -339,14 +553,22 @@ async def finish_minigame(
             player.energy = config.MAX_ENERGY
             charge_notes.append(f"⚡ {name}: энергия восстановлена")
 
+    rank_info = bump_job(player, game.job)
+    if rank_info.get("note"):
+        charge_notes.append(rank_info["note"])
+
     await session.commit()
 
     if player.nation_id:
         from services.weeklies import add_progress
+        from services.caravan import on_nation_job
 
         await add_progress(session, player.nation_id, "jobs_total", 1)
         if tax:
             await add_progress(session, player.nation_id, "treasury_gain", tax)
+        caravan_note = await on_nation_job(session, player)
+        if caravan_note:
+            charge_notes.append(caravan_note)
 
     quest_extra = 0
     if "quest_x2" in loadout.charges_ready:
@@ -372,6 +594,8 @@ async def finish_minigame(
         charge_notes.extend(xp_info["level_ups"])
     elif xp_info.get("gained"):
         charge_notes.append(f"⭐ +{xp_info['gained']} XP")
+
+    charge_notes.append(f"📖 {pick_flavor(game.job)}")
 
     drop_pool = spec.get("loot_pool") or game.job
     if cata and cata.get("loot_pool"):

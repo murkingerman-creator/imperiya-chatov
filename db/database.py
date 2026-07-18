@@ -41,6 +41,7 @@ _PLAYER_COLS = {
     "xp": "INTEGER DEFAULT 0",
     "level": "INTEGER DEFAULT 1",
     "last_wheel_at": "DATETIME",
+    "job_counts": "VARCHAR(512) DEFAULT ''",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",
@@ -74,6 +75,8 @@ _NATION_COLS = {
     "fortify_until": "DATETIME",
     "xp_buff_until": "DATETIME",
     "raid_fund": "INTEGER DEFAULT 0",
+    "caravan_progress": "INTEGER DEFAULT 0",
+    "caravan_started_at": "DATETIME",
 }
 _EQUIPPED_COLS = {
     "upgrade": "INTEGER DEFAULT 0",

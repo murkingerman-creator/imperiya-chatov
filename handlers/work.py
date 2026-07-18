@@ -23,11 +23,13 @@ def register(bot: Bot) -> None:
             await session.commit()
             await reply(
                 message,
-                "💼 Работы открываются с уровнем.\n"
+                "💼 Работы — у каждой своя механика (не просто угадайка).\n"
                 f"{format_level_line(player)}\n"
-                "🍺 Таверна / 🎣 Рыбалка — с 1 ур.\n"
-                "🔒 = нужен уровень. Кнопка «⭐ Уровни» — полный список.\n"
-                f"⚡ Энергия до {config.MAX_ENERGY}. Лут → 🎒 Сумка.",
+                "🎣 Рыбалка — подсечка по времени · 🔥 Кузня — ритм\n"
+                "🛒 Рынок — купи/продай · ⛏ Шахта — риск\n"
+                "Ранги профессий копятся → бонус к доходу.\n"
+                "В стране: 5 смен/час = 🐪 караван в казну.\n"
+                f"⚡ до {config.MAX_ENERGY}. Лут → 🎒 Сумка.",
                 keyboard=jobs_keyboard(player.level or 1).get_json(),
             )
 
@@ -113,6 +115,16 @@ def register(bot: Bot) -> None:
                 await reply(message, e.message, keyboard=jobs_keyboard(player.level or 1).get_json())
                 return
 
+            if result.get("continue"):
+                await reply(
+                    message,
+                    result["prompt"],
+                    keyboard=minigame_keyboard(
+                        result["token"], result["buttons"]
+                    ).get_json(),
+                )
+                return
+
             status = "Успех!" if result["success"] else "Провал…"
             tax_line = ""
             if result["tax"]:
@@ -146,6 +158,13 @@ def register(bot: Bot) -> None:
                 f"💼 {player.name}: {result['title']} "
                 f"{'✓' if result['success'] else '✗'} +{result['net']}{drop_short}",
             )
+            if any("Караван собран" in n for n in notes):
+                await announce_nation(
+                    message.ctx_api,
+                    player.nation,
+                    f"🐪 Караван {player.nation.flag_emoji if player.nation else ''} "
+                    f"собран трудами граждан!",
+                )
 
             step = player.onboarding_step or 0
             kb = (
