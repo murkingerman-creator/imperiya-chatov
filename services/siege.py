@@ -34,7 +34,15 @@ async def start_siege(session: AsyncSession, player: Player, target_name: str) -
     attacker = player.nation
     until = ensure_aware(attacker.siege_until)
     if until and until > utcnow() and attacker.siege_target_id:
-        raise SiegeError("Осада уже идёт. Добей цель или дождись конца.")
+        target = await get_nation_by_id(session, attacker.siege_target_id)
+        tname = f"{target.flag_emoji} {target.name}" if target else "цели"
+        raise SiegeError(
+            f"Осада уже идёт → {tname}.\n"
+            f"Бить нужно через ⚔ Война / Рейд по этой стране "
+            f"(не кнопку «Осада» повторно).\n"
+            f"Стена {attacker.siege_progress}/{config.SIEGE_NEED_PROGRESS}, "
+            f"попытки {attacker.siege_attempts}/{config.SIEGE_MAX_ATTEMPTS}."
+        )
     target = await get_nation_by_name(session, target_name)
     if not target:
         raise SiegeError(f"Страна «{target_name}» не найдена.")
@@ -62,7 +70,10 @@ async def siege_status(session: AsyncSession, nation: Nation) -> str | None:
         f"🏰 Осада → {name}\n"
         f"Стена: {nation.siege_progress}/{config.SIEGE_NEED_PROGRESS} · "
         f"попытки {nation.siege_attempts}/{config.SIEGE_MAX_ATTEMPTS} · "
-        f"ещё ~{left} мин"
+        f"ещё ~{left} мин\n"
+        f"👉 Жми ⚔ Война и рейдь именно эту страну — каждый успешный рейд "
+        f"ломает стену (+1). {config.SIEGE_NEED_PROGRESS} успеха за "
+        f"{config.SIEGE_MAX_ATTEMPTS} попыток → финальный куш ×2."
     )
 
 

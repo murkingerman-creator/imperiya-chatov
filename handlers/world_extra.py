@@ -166,9 +166,14 @@ def register(bot: Bot) -> None:
             st = await siege_status(session, player.nation)
             targets = await raid_candidates(session, player.nation.id)
             lines = [
-                st or "🏰 Осады нет. Объяви: осада Название (3 удара / 12ч).",
+                st
+                or (
+                    "🏰 Осады нет. Объяви цель кнопкой или: осада Название\n"
+                    f"({config.SIEGE_NEED_PROGRESS} успешных рейда / "
+                    f"{config.SIEGE_MAX_ATTEMPTS} попыток за {config.SIEGE_HOURS}ч)."
+                ),
                 "",
-                "Цель кнопкой или текстом.",
+                "Объявление осады ≠ удар. После старта бей через ⚔ Война.",
             ]
             await reply(
                 message,
@@ -239,9 +244,14 @@ async def _do_siege(message: Message, target: str) -> None:
         atk, dfn = r["attacker"], r["defender"]
         msg = (
             f"🏰 Осада объявлена!\n"
-            f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n"
-            f"{config.SIEGE_NEED_PROGRESS} успешных рейда за {config.SIEGE_HOURS}ч "
-            f"(макс {config.SIEGE_MAX_ATTEMPTS} попыток) → куш ×2"
+            f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name}\n\n"
+            f"Как бить:\n"
+            f"1) ⚔ Война → выбери {dfn.flag_emoji} {dfn.name}\n"
+            f"2) Успешный рейд = +1 к стене "
+            f"({config.SIEGE_NEED_PROGRESS} нужно)\n"
+            f"3) Всего {config.SIEGE_MAX_ATTEMPTS} попытки за "
+            f"{config.SIEGE_HOURS}ч\n"
+            f"4) Стена пала → этот рейд даёт куш ×{config.SIEGE_FINALE_STEAL_MULT:g}"
         )
         await reply(message, msg, keyboard=main_keyboard().get_json())
         await notify_nation_chat(message.ctx_api, atk.chat_peer_id, msg)
