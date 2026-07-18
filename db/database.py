@@ -34,6 +34,7 @@ _PLAYER_COLS = {
     "raid_wins": "INTEGER DEFAULT 0",
     "onboarding_step": "INTEGER DEFAULT 0",
     "last_chat_seen_at": "DATETIME",
+    "dm_ok": "INTEGER DEFAULT 1",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",

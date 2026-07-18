@@ -1,9 +1,12 @@
+from vkbottle import GroupEventType, GroupTypes
 from vkbottle.bot import Bot, Message
 
 from bot.config import is_admin
 from bot.keyboards import admin_keyboard, main_keyboard, onboarding_keyboard
+from db.database import SessionLocal
 from handlers.common import reply, MENU_TEXT, ensure_player, user_keyboard
 from handlers.rules import match_cmd, payload_cmd
+from services.broadcast import mark_dm_ok
 from services.onboarding import onboarding_prompt
 
 
@@ -44,3 +47,21 @@ def register(bot: Bot) -> None:
     @bot.on.message(payload={"command": "start"})
     async def start_command_payload(message: Message):
         await _send_menu(message)
+
+    @bot.on.raw_event(
+        GroupEventType.MESSAGE_ALLOW, dataclass=GroupTypes.MessageAllow
+    )
+    async def on_message_allow(event: GroupTypes.MessageAllow):
+        uid = int(event.object.user_id)
+        async with SessionLocal() as session:
+            await mark_dm_ok(session, uid, True)
+            await session.commit()
+
+    @bot.on.raw_event(
+        GroupEventType.MESSAGE_DENY, dataclass=GroupTypes.MessageDeny
+    )
+    async def on_message_deny(event: GroupTypes.MessageDeny):
+        uid = int(event.object.user_id)
+        async with SessionLocal() as session:
+            await mark_dm_ok(session, uid, False)
+            await session.commit()

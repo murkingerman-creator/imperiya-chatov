@@ -39,6 +39,9 @@ async def get_or_create_player(
             player.name = name
         if not player.invite_code:
             player.invite_code = generate_invite_code()
+        # написал боту → ЛС снова доступны
+        if not player.dm_ok:
+            player.dm_ok = True
         regenerate_energy(player)
         return player
 
@@ -51,6 +54,7 @@ async def get_or_create_player(
         invite_code=generate_invite_code(),
         daily_streak=0,
         onboarding_step=1,
+        dm_ok=True,
     )
     session.add(player)
     await session.commit()

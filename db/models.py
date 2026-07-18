@@ -74,6 +74,8 @@ class Player(Base):
     raid_wins: Mapped[int] = mapped_column(Integer, default=0)
     onboarding_step: Mapped[int] = mapped_column(Integer, default=0)  # 0=done, 1..3=steps
     last_chat_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # можно ли писать в ЛС (False после VK 901/902; True после ответа игрока)
+    dm_ok: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

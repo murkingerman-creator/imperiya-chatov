@@ -49,12 +49,13 @@ async def background_loop(bot: Bot) -> None:
                 if flash:
                     announce = format_flash_announce(flash)
                     try:
+                        # вспышки — в беседы стран (+ стена); ЛС только по запросу админа
                         await broadcast(
                             bot.api,
                             session,
                             announce,
                             to_chats=True,
-                            to_dms=True,
+                            to_dms=False,
                         )
                     except Exception as be:
                         logger.warning("flash broadcast: %s", be)
