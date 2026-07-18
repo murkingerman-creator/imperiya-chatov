@@ -1,5 +1,6 @@
 from handlers import (
     admin,
+    bugs,
     customize,
     daily,
     fun,
@@ -35,6 +36,7 @@ def register_all(bot) -> None:
     market.register(bot)
     shop.register(bot)
     suggestions.register(bot)
+    bugs.register(bot)
     nation.register(bot)
     nation_extra.register(bot)
 

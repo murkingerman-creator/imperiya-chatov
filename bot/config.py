@@ -387,6 +387,13 @@ SUGGESTION_COOLDOWN_HOURS = 2
 SUGGESTION_REWARD = 80  # кроны за принятое предложение
 SUGGESTION_LIST_LIMIT = 15
 
+# Bug reports
+BUG_MIN_LEN = 15
+BUG_MAX_LEN = 800
+BUG_COOLDOWN_HOURS = 1
+BUG_REWARD = 100  # кроны за подтверждённый баг
+BUG_LIST_LIMIT = 15
+
 # Arsenal / loot
 LOOT_CHANCE_SUCCESS = 0.12
 LOOT_CHANCE_FAIL = 0.05

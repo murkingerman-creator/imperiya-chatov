@@ -286,3 +286,22 @@ class Suggestion(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class BugReport(Base):
+    """Сообщения игроков о багах."""
+
+    __tablename__ = "bug_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    author_vk_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    author_name: Mapped[str] = mapped_column(String(128), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    # pending | accepted | rejected
+    admin_note: Mapped[str] = mapped_column(String(256), default="")
+    reward: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

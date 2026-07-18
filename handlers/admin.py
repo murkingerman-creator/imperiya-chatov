@@ -26,6 +26,13 @@ from services.suggestions import (
     list_pending,
     reject_suggestion,
 )
+from services.bugs import (
+    BugError,
+    accept_bug,
+    format_bugs_list,
+    list_pending_bugs,
+    reject_bug,
+)
 from services.flash_events import (
     clear_flash,
     force_flash,
@@ -70,6 +77,7 @@ def _help_text() -> str:
         "• !вспышка [KEY] [часы] · !вспышка_стоп\n"
         "• !джекпот СУММА · !дождь Название СУММА\n"
         "• !всем СУММА [текст] · !принять / !отклонить\n"
+        "• !багпринять ID · !баготклонить ID [причина]\n"
         "🌤 Ивенты · 🎮 Ещё — расширенные действия"
     )
 
@@ -278,6 +286,18 @@ def register(bot: Bot) -> None:
             await reply(
                 message,
                 format_suggestions_list(items),
+                keyboard=admin_keyboard().get_json(),
+            )
+
+    @bot.on.message(func=payload_cmd("adm_bugs"))
+    async def adm_bugs(message: Message):
+        if not await _require(message):
+            return
+        async with SessionLocal() as session:
+            items = await list_pending_bugs(session)
+            await reply(
+                message,
+                format_bugs_list(items),
                 keyboard=admin_keyboard().get_json(),
             )
 
@@ -641,6 +661,30 @@ async def _handle_commands(message: Message, text: str, lower: str) -> bool:
             await reply(
                 message,
                 "Формат: !отклонить ID [причина]",
+                keyboard=admin_keyboard().get_json(),
+            )
+        return True
+    if lower.startswith("!багпринять ") or lower.startswith("!bugaccept "):
+        parts = text.split()
+        if len(parts) >= 2 and parts[1].isdigit():
+            await _do_accept_bug(message, int(parts[1]))
+        else:
+            await reply(
+                message,
+                "Формат: !багпринять ID",
+                keyboard=admin_keyboard().get_json(),
+            )
+        return True
+    if lower.startswith("!баготклонить ") or lower.startswith("!bugreject "):
+        parts = text.split(maxsplit=2)
+        if len(parts) >= 2 and parts[1].isdigit():
+            await _do_reject_bug(
+                message, int(parts[1]), parts[2] if len(parts) >= 3 else ""
+            )
+        else:
+            await reply(
+                message,
+                "Формат: !баготклонить ID [причина]",
                 keyboard=admin_keyboard().get_json(),
             )
         return True
@@ -1266,6 +1310,67 @@ async def _do_reject(message: Message, sug_id: int, note: str = "") -> None:
     await reply(
         message,
         f"❌ #{sug_id} отклонено · {author_name}"
+        + (f"\nПричина: {reason}" if reason else "")
+        + (" · ЛС отправлено" if dm_ok else " · ЛС не доставлено"),
+        keyboard=admin_keyboard().get_json(),
+    )
+
+
+async def _do_accept_bug(message: Message, bug_id: int) -> None:
+    if not await _require(message):
+        return
+    async with SessionLocal() as session:
+        try:
+            result = await accept_bug(session, bug_id)
+        except BugError as e:
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
+            return
+        bug = result["bug"]
+        reward = result["reward"]
+        author_id = bug.author_vk_id
+        author_name = bug.author_name
+        body = bug.text
+        crowns = result["crowns"]
+
+    dm = (
+        f"✅ Твой багрепорт #{bug_id} подтверждён!\n\n"
+        f"«{body}»\n\n"
+        f"Награда: +{reward} крон"
+        + (f" (баланс {crowns})." if crowns is not None else ".")
+        + "\nСпасибо — баг взят в работу."
+    )
+    dm_ok = await _notify_author(message, author_id, dm)
+    await reply(
+        message,
+        f"🐛 #{bug_id} подтверждён · {author_name}\n"
+        f"+{reward} крон автору"
+        + (" · ЛС отправлено" if dm_ok else " · ЛС не доставлено"),
+        keyboard=admin_keyboard().get_json(),
+    )
+
+
+async def _do_reject_bug(message: Message, bug_id: int, note: str = "") -> None:
+    if not await _require(message):
+        return
+    async with SessionLocal() as session:
+        try:
+            result = await reject_bug(session, bug_id, note)
+        except BugError as e:
+            await reply(message, e.message, keyboard=admin_keyboard().get_json())
+            return
+        bug = result["bug"]
+        author_id = bug.author_vk_id
+        author_name = bug.author_name
+        body = bug.text
+        reason = (note or "").strip()
+
+    dm = f"❌ Багрепорт #{bug_id} отклонён.\n\n«{body}»"
+    if reason:
+        dm += f"\n\nПричина: {reason}"
+    dm_ok = await _notify_author(message, author_id, dm)
+    await reply(
+        message,
+        f"🐛 #{bug_id} отклонён · {author_name}"
         + (f"\nПричина: {reason}" if reason else "")
         + (" · ЛС отправлено" if dm_ok else " · ЛС не доставлено"),
         keyboard=admin_keyboard().get_json(),
