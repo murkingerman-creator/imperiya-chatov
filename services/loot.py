@@ -106,6 +106,19 @@ async def grant_drop(
     if not item:
         return None
     result = await add_item(session, player, item["id"], 1)
+    rarity = item.get("rarity") or ""
+    if rarity in ("epic", "legendary", "mythic"):
+        from services.chronicle_store import add_event
+
+        mark = cat.RARITY_MARK.get(rarity, "✨")
+        label = cat.RARITY_LABEL.get(rarity, rarity)
+        who = player.name or f"Игрок {player.vk_id}"
+        await add_event(
+            session,
+            "loot",
+            f"{mark} {who} добыл [{label}] {item['name']}",
+            str(player.nation_id or ""),
+        )
     return {
         "item": result["item"],
         "first": result["first"],

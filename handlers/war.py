@@ -195,7 +195,7 @@ async def _do_raid(message: Message, target: str) -> None:
         await add_event(
             session,
             "raid",
-            f"Рейд {atk.flag_emoji} {atk.name} на {dfn.flag_emoji} {dfn.name} (−{result['stolen']})",
+            f"{atk.flag_emoji} {atk.name} → {dfn.flag_emoji} {dfn.name} (−{result['stolen']} крон)",
             f"{atk.id},{dfn.id}",
         )
         from bot import config

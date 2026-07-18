@@ -287,7 +287,7 @@ def register(bot: Bot) -> None:
             await add_event(
                 session,
                 "found",
-                f"Основана {nation.flag_emoji} {nation.name}",
+                f"{nation.flag_emoji} {nation.name} (лидер {player.name})",
                 str(nation.id),
             )
             await notify_nation_chat(
