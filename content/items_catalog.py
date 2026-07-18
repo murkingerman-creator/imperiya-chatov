@@ -331,15 +331,21 @@ def items_in_pool(pool: str, rarity: str | None = None) -> list[dict]:
     return out
 
 
-def format_item(it: dict) -> str:
+def format_item(it: dict, *, with_slot: bool = True) -> str:
     mark = RARITY_MARK.get(it["rarity"], "⬜")
     label = RARITY_LABEL.get(it["rarity"], it["rarity"])
+    slot = SLOT_LABEL.get(it.get("slot", ""), "")
+    if with_slot and slot:
+        return f"{mark} [{label}] · {slot} · {it['name']}"
     return f"{mark} [{label}] {it['name']}"
 
 
 def format_buffs(it: dict) -> str:
     """Человекочитаемые баффы / заряд / аура для карточки и торга."""
     lines: list[str] = []
+    slot = SLOT_LABEL.get(it.get("slot", ""), it.get("slot", ""))
+    if slot:
+        lines.append(f"📦 Куда надеть: {slot} (слот снаряжения)")
     if it.get("desc"):
         lines.append(it["desc"])
     p = it.get("passives") or {}
@@ -394,9 +400,6 @@ def format_buffs(it: dict) -> str:
         lines.append("🌫 Для тебя всегда «золотая жила»")
     if aura.get("raid_target_mark"):
         lines.append("🌫 Страна помечена как богатая добыча")
-    slot = SLOT_LABEL.get(it.get("slot", ""), it.get("slot", ""))
-    if slot:
-        lines.append(f"Слот: {slot}")
     # unique lines, keep order
     seen = set()
     out = []

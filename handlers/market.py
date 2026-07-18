@@ -298,7 +298,7 @@ async def _browse(
                 keyboard=market_menu_keyboard().get_json(),
             )
             return
-        lines = [title, "Дешевле сверху. Жми лот — баффы и покупка.", ""]
+        lines = [title, "Дешевле сверху. Жми лот — слот, баффы и покупка.", ""]
         for listing in listings:
             it = cat.get_item(listing.item_id)
             short = (it.get("desc") or "")[:40] if it else ""
