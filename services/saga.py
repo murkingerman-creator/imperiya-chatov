@@ -91,6 +91,9 @@ async def claim_saga(session: AsyncSession, player: Player) -> str:
 
     player.saga_claimed_day = day
     player.crowns += int(config.SAGA_DAY_REWARD)
+    from services.levels import add_xp
+
+    await add_xp(session, player, config.XP_SAGA_DAY, reason="сага")
     msg = f"📖 День {day} саги сдан! +{config.SAGA_DAY_REWARD}💰"
 
     if day >= config.SAGA_DAYS:
