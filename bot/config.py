@@ -309,6 +309,12 @@ WORLD_EVENTS = {
 ADMIN_EVENT_DEFAULT_HOURS = 6
 ADMIN_EVENT_MAX_HOURS = 48
 
+# Random flash events (every 2–3 hours)
+FLASH_INTERVAL_MIN_HOURS = 2.0
+FLASH_INTERVAL_MAX_HOURS = 3.0
+FLASH_DURATION_HOURS = 2.0
+FLASH_DURATION_MAX_HOURS = 6.0
+
 TITLE_LABELS = {
     "first_raid": "⚔ Первый рейд",
     "streak_7": "🔥 Стрик 7",

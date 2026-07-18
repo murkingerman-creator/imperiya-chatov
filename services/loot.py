@@ -27,6 +27,7 @@ def roll_drop(
     job: str | None = None,
     event_key: str | None = None,
     loot_luck: float = 0.0,
+    loot_mult: float = 1.0,
     force: bool = False,
     rng: random.Random | None = None,
 ) -> dict | None:
@@ -47,12 +48,7 @@ def roll_drop(
     elif event_key == "plague":
         chance *= 0.7
 
-    # admin / world loot_mult (via event dict key when passed as event_key matching WORLD_EVENTS)
-    from bot import config as _cfg
-
-    if event_key and event_key in _cfg.WORLD_EVENTS:
-        chance *= float(_cfg.WORLD_EVENTS[event_key].get("loot_mult") or 1.0)
-
+    chance *= max(0.1, float(loot_mult or 1.0))
     chance = min(0.55, chance + loot_luck)
 
     if not force and rng.random() > chance:
@@ -96,6 +92,7 @@ async def grant_drop(
     job: str | None = None,
     event_key: str | None = None,
     loot_luck: float = 0.0,
+    loot_mult: float = 1.0,
     force_item: dict | None = None,
 ) -> dict | None:
     item = force_item or roll_drop(
@@ -104,6 +101,7 @@ async def grant_drop(
         job=job,
         event_key=event_key,
         loot_luck=loot_luck,
+        loot_mult=loot_mult,
     )
     if not item:
         return None

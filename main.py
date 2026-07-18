@@ -7,8 +7,10 @@ from bot.config import GROUP_ID, VK_TOKEN, require_config
 from db.database import SessionLocal, init_db
 from handlers import register_all
 from services.auction import settle_expired_auctions
+from services.broadcast import broadcast
 from services.chatwars import finish_due_wars
 from services.chronicle import maybe_post_daily_chronicle, post_flash
+from services.flash_events import format_flash_announce, maybe_roll_flash
 from services.notify import post_wall
 from services.season import maybe_rotate_season
 from services.world_events import ensure_daily_event
@@ -43,6 +45,21 @@ async def background_loop(bot: Bot) -> None:
         try:
             async with SessionLocal() as session:
                 await ensure_daily_event(session)
+                flash = await maybe_roll_flash(session)
+                if flash:
+                    announce = format_flash_announce(flash)
+                    try:
+                        await broadcast(
+                            bot.api,
+                            session,
+                            announce,
+                            to_chats=True,
+                            to_dms=True,
+                        )
+                    except Exception as be:
+                        logger.warning("flash broadcast: %s", be)
+                    await post_flash(bot.api, session, announce)
+                    logger.info("Flash event: %s", flash.get("key"))
                 await settle_expired_auctions(session)
                 war_msgs = await finish_due_wars(session)
                 for msg in war_msgs:
@@ -51,9 +68,9 @@ async def background_loop(bot: Bot) -> None:
                     logger.info(msg)
                 season_awards = await maybe_rotate_season(session)
                 if season_awards:
-                    flash = "🏛 Новый сезон!\n" + "\n".join(season_awards)
-                    await post_flash(bot.api, session, flash)
-                    await post_wall(bot.api, flash)
+                    flash_txt = "🏛 Новый сезон!\n" + "\n".join(season_awards)
+                    await post_flash(bot.api, session, flash_txt)
+                    await post_wall(bot.api, flash_txt)
                 posted = await maybe_post_daily_chronicle(bot.api, session)
                 if posted:
                     logger.info("Хроника мира опубликована на стену группы")

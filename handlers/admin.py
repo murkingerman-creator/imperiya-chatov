@@ -26,6 +26,14 @@ from services.suggestions import (
     list_pending,
     reject_suggestion,
 )
+from services.flash_events import (
+    clear_flash,
+    force_flash,
+    format_flash_announce,
+    format_flash_event,
+    get_flash_event,
+    list_flashes_text,
+)
 from services.world_events import clear_event, force_event, format_event, get_active_event
 
 # peer_id + from_id -> mode
@@ -59,6 +67,7 @@ def _help_text() -> str:
         "🛠 Админка\n"
         "• !дать / !тюрьма / !свобода / !предмет / !титул\n"
         "• !ивент KEY [часы] · !стоп_ивент\n"
+        "• !вспышка [KEY] [часы] · !вспышка_стоп\n"
         "• !джекпот СУММА · !дождь Название СУММА\n"
         "• !всем СУММА [текст] · !принять / !отклонить\n"
         "🌤 Ивенты · 🎮 Ещё — расширенные действия"
@@ -88,14 +97,16 @@ def register(bot: Bot) -> None:
             return
         async with SessionLocal() as session:
             ev = await get_active_event(session)
+            flash = await get_flash_event(session)
         await reply(
             message,
             f"🌤 Мировые ивенты\n"
-            f"Сейчас: {format_event(ev)}\n\n"
-            f"Нажми ивент → укажи часы "
-            f"(Enter/пусто = {config.ADMIN_EVENT_DEFAULT_HOURS}ч, "
-            f"макс {config.ADMIN_EVENT_MAX_HOURS}).\n"
-            f"Или: !ивент harvest 6",
+            f"Сутки: {format_event(ev)}\n"
+            f"{format_flash_event(flash)}\n\n"
+            f"Дневной: кнопка → часы "
+            f"(пусто = {config.ADMIN_EVENT_DEFAULT_HOURS}ч).\n"
+            f"⚡ Вспышка ★ — случайная из 30 (авто раз в 2–3ч).\n"
+            f"!вспышка KEY [часы] · !вспышка_стоп",
             keyboard=admin_events_keyboard().get_json(),
         )
 
@@ -105,9 +116,10 @@ def register(bot: Bot) -> None:
             return
         async with SessionLocal() as session:
             ev = await get_active_event(session)
+            flash = await get_flash_event(session)
         await reply(
             message,
-            format_event(ev),
+            f"{format_event(ev)}\n\n{format_flash_event(flash)}",
             keyboard=admin_events_keyboard().get_json(),
         )
 
@@ -116,6 +128,44 @@ def register(bot: Bot) -> None:
         if not await _require(message):
             return
         await _do_stop_event(message)
+
+    @bot.on.message(func=payload_cmd("adm_flash_rand"))
+    async def adm_flash_rand(message: Message):
+        if not await _require(message):
+            return
+        await _do_force_flash(message, key=None, hours=None)
+
+    @bot.on.message(func=payload_cmd("adm_flash_list"))
+    async def adm_flash_list(message: Message):
+        if not await _require(message):
+            return
+        text = list_flashes_text()
+        # VK message limit ~4000
+        if len(text) > 3800:
+            mid = len(text) // 2
+            split = text.rfind("\n• ", 0, mid)
+            if split < 0:
+                split = mid
+            await reply(
+                message,
+                text[:split].strip(),
+                keyboard=admin_events_keyboard().get_json(),
+            )
+            await reply(
+                message,
+                text[split:].strip(),
+                keyboard=admin_events_keyboard().get_json(),
+            )
+        else:
+            await reply(
+                message, text, keyboard=admin_events_keyboard().get_json()
+            )
+
+    @bot.on.message(func=payload_cmd("adm_flash_stop"))
+    async def adm_flash_stop(message: Message):
+        if not await _require(message):
+            return
+        await _do_stop_flash(message)
 
     @bot.on.message(func=payload_cmd("adm_ev"))
     async def adm_ev_ask(message: Message):
@@ -628,6 +678,39 @@ async def _handle_commands(message: Message, text: str, lower: str) -> bool:
     if lower in {"!стоп_ивент", "!stop_event", "!ивент_стоп"}:
         await _do_stop_event(message)
         return True
+    if lower.startswith("!вспышка ") or lower.startswith("!flash "):
+        parts = text.split()
+        # !вспышка | !вспышка KEY | !вспышка KEY 2
+        key = None
+        hours = None
+        if len(parts) >= 2 and parts[1] not in {"стоп", "stop", "random", "случ", "★"}:
+            key = parts[1].strip()
+            if len(parts) >= 3:
+                try:
+                    hours = float(parts[2].replace(",", "."))
+                except ValueError:
+                    hours = None
+        await _do_force_flash(message, key=key, hours=hours)
+        return True
+    if lower in {
+        "!вспышка",
+        "!flash",
+        "!вспышка_случ",
+        "!flash_rand",
+    }:
+        await _do_force_flash(message, key=None, hours=None)
+        return True
+    if lower in {"!вспышка_стоп", "!flash_stop", "!стоп_вспышка"}:
+        await _do_stop_flash(message)
+        return True
+    if lower in {"!вспышки", "!flash_list"}:
+        text_list = list_flashes_text()
+        await reply(
+            message,
+            text_list[:3800],
+            keyboard=admin_events_keyboard().get_json(),
+        )
+        return True
     if lower.startswith("!тюрьма ") or lower.startswith("!jail "):
         parts = text.split()
         if len(parts) >= 3 and parts[1].isdigit():
@@ -755,18 +838,84 @@ async def _do_stop_event(message: Message) -> None:
     if not prev:
         await reply(
             message,
-            "Активного ивента нет.",
+            "Активного дневного ивента нет.",
             keyboard=admin_events_keyboard().get_json(),
         )
         return
     body = (
-        f"⏹ Ивент завершён администратором.\n"
+        f"⏹ Ивент дня завершён администратором.\n"
         f"Был: {prev.get('title', '?')}.\n"
-        f"Снова обычный день."
+        f"Снова обычный день (вспышки судьбы не тронуты)."
     )
     await reply(
         message,
         f"⏹ Остановлен: {prev.get('title')}\n⏳ Рассылка…",
+        keyboard=admin_events_keyboard().get_json(),
+    )
+    async with SessionLocal() as session:
+        try:
+            report = await broadcast(
+                message.ctx_api, session, body, to_chats=True, to_dms=True
+            )
+        except ValueError as e:
+            await reply(message, str(e), keyboard=admin_events_keyboard().get_json())
+            return
+    await reply(
+        message, format_report(report), keyboard=admin_events_keyboard().get_json()
+    )
+
+
+async def _do_force_flash(
+    message: Message, key: str | None = None, hours: float | None = None
+) -> None:
+    if not await _require(message):
+        return
+    async with SessionLocal() as session:
+        try:
+            ev = await force_flash(session, key=key, hours=hours, forced=True)
+        except ValueError as e:
+            await reply(
+                message, str(e), keyboard=admin_events_keyboard().get_json()
+            )
+            return
+    body = format_flash_announce(ev)
+    await reply(
+        message,
+        f"✅ Вспышка: {ev['title']}\n⏳ Рассылка…",
+        keyboard=admin_events_keyboard().get_json(),
+    )
+    async with SessionLocal() as session:
+        try:
+            report = await broadcast(
+                message.ctx_api, session, body, to_chats=True, to_dms=True
+            )
+        except ValueError as e:
+            await reply(message, str(e), keyboard=admin_events_keyboard().get_json())
+            return
+    await reply(
+        message, format_report(report), keyboard=admin_events_keyboard().get_json()
+    )
+
+
+async def _do_stop_flash(message: Message) -> None:
+    if not await _require(message):
+        return
+    async with SessionLocal() as session:
+        prev = await clear_flash(session)
+    if not prev:
+        await reply(
+            message,
+            "Активной вспышки нет.",
+            keyboard=admin_events_keyboard().get_json(),
+        )
+        return
+    body = (
+        f"⏹ Вспышка судьбы погасла.\n"
+        f"Была: {prev.get('title', '?')}."
+    )
+    await reply(
+        message,
+        f"⏹ Вспышка остановлена: {prev.get('title')}\n⏳ Рассылка…",
         keyboard=admin_events_keyboard().get_json(),
     )
     async with SessionLocal() as session:

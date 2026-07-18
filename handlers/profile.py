@@ -14,6 +14,7 @@ from services.player import (
     regenerate_energy,
     utcnow,
 )
+from services.flash_events import format_flash_event, get_flash_event
 from services.world_events import format_event, get_active_event
 from content import items_catalog as cat
 
@@ -27,6 +28,7 @@ def register(bot: Bot) -> None:
             regenerate_energy(player)
             await session.commit()
             ev = await get_active_event(session)
+            flash = await get_flash_event(session)
             equipped = await get_equipped(session, player.vk_id)
             codex_n = await discovered_count(session, player.vk_id)
 
@@ -72,6 +74,7 @@ def register(bot: Bot) -> None:
                 f"📨 Код: {player.invite_code}\n"
                 f"🏛 Страна: {nation_line}"
                 f"{jail_line}\n"
-                f"{format_event(ev)}"
+                f"{format_event(ev)}\n"
+                f"{format_flash_event(flash)}"
             )
             await reply(message, text, keyboard=main_keyboard().get_json())

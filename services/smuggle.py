@@ -9,8 +9,10 @@ from services.achievements import grant_title
 from services.item_effects import get_buff, get_loadout, set_buff, try_consume_charge
 from services.loot import grant_drop
 from services.player import ensure_aware, regenerate_energy, utcnow
+from services.flash_events import get_flash_event
 from services.world_events import (
     get_active_event,
+    loot_multiplier,
     smuggle_multiplier,
     tax_modifier,
     work_multiplier,
@@ -48,12 +50,13 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
 
     loadout = await get_loadout(session, player)
     ev = await get_active_event(session)
+    flash = await get_flash_event(session)
     event_key = ev["key"] if ev else None
     if loadout.personal_gold_vein:
         event_key = "gold_vein"
 
     chance = config.SMUGGLE_SUCCESS_CHANCE + loadout.smuggle_chance
-    sm_mult = smuggle_multiplier(ev)
+    sm_mult = smuggle_multiplier(ev, flash)
     if sm_mult != 1.0:
         chance = chance * sm_mult
     chance = max(0.05, min(0.85, chance))
@@ -62,19 +65,25 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
     player.last_smuggle_at = now
     player.energy_updated_at = now
     charge_notes: list[str] = []
+    if flash:
+        charge_notes.append(f"⚡ {flash['title']}")
 
     if success:
         base = random.randint(config.SMUGGLE_REWARD_MIN, config.SMUGGLE_REWARD_MAX)
         gross = int(
             base
-            * work_multiplier(ev)
+            * work_multiplier(ev, flash)
             * 3
             * (1.0 + loadout.smuggle_reward)
             * sm_mult
         )
         tax = 0
         if player.nation:
-            rate = (player.nation.tax_rate or 0.1) + tax_modifier(ev) + loadout.tax_add
+            rate = (
+                (player.nation.tax_rate or 0.1)
+                + tax_modifier(ev, flash)
+                + loadout.tax_add
+            )
             rate = max(0.0, min(0.4, rate))
             tax = max(1, int(gross * rate))
             player.nation.treasury += tax
@@ -101,6 +110,7 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
             success=True,
             event_key=event_key,
             loot_luck=loadout.loot_luck,
+            loot_mult=loot_multiplier(ev, flash),
         )
         return {
             "success": True,

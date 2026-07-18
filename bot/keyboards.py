@@ -256,8 +256,12 @@ def admin_events_keyboard() -> Keyboard:
         )
     kb.row()
     kb.add(Text("📡 Текущий", {"cmd": "adm_ev_status"}), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text("⏹ Стоп", {"cmd": "adm_ev_stop"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Text("⏹ Стоп день", {"cmd": "adm_ev_stop"}), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
+    kb.add(Text("⚡ Вспышка ★", {"cmd": "adm_flash_rand"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("⚡ Список", {"cmd": "adm_flash_list"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("⚡ Стоп вспышки", {"cmd": "adm_flash_stop"}), color=KeyboardButtonColor.NEGATIVE)
     kb.add(Text("« Назад", {"cmd": "admin"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 

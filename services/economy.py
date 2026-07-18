@@ -170,7 +170,13 @@ async def finish_minigame(
     )
     from services.loot import grant_drop
     from services.quests import on_job_done
-    from services.world_events import get_active_event, tax_modifier, work_multiplier
+    from services.flash_events import get_flash_event
+    from services.world_events import (
+        get_active_event,
+        loot_multiplier,
+        tax_modifier,
+        work_multiplier,
+    )
 
     game = _sessions.pop(token, None)
     if not game or game.vk_id != player.vk_id:
@@ -206,18 +212,22 @@ async def finish_minigame(
     base = random.randint(spec["reward_min"], spec["reward_max"])
     mult = spec["success_mult"] if success else spec["fail_mult"]
     ev = await get_active_event(session)
+    flash = await get_flash_event(session)
     event_key = ev["key"] if ev else None
 
     # personal gold vein / ignore plague
-    work_ev_mult = work_multiplier(ev)
+    work_ev_mult = work_multiplier(ev, flash)
     if loadout.personal_gold_vein:
         work_ev_mult = max(work_ev_mult, 1.5)
         event_key = "gold_vein"
-    if event_key == "plague" and "ignore_plague" in loadout.charges_ready:
+    if ev and ev.get("key") == "plague" and "ignore_plague" in loadout.charges_ready:
         name = await try_consume_charge(session, player, "ignore_plague", loadout)
         if name:
-            work_ev_mult = 1.0
+            # сбрасываем только эффект чумы, вспышка остаётся
+            work_ev_mult = work_multiplier(None, flash)
             charge_notes.append(f"⚡ {name}: чума не действует")
+    if flash:
+        charge_notes.append(f"⚡ {flash['title']}")
 
     gross = max(1, int(base * mult * work_ev_mult))
     gross, item_mult = apply_work_modifiers(gross, loadout, game.job)
@@ -250,7 +260,7 @@ async def finish_minigame(
         nation_name = player.nation.name
         tax_rate = (
             (player.nation.tax_rate or config.TAX_RATE)
-            + tax_modifier(ev)
+            + tax_modifier(ev, flash)
             + loadout.tax_add
         )
         tax_rate = max(0.0, min(0.4, tax_rate))
@@ -296,6 +306,7 @@ async def finish_minigame(
         quest = await on_job_done(session, player)
 
     drop_pool = spec.get("loot_pool") or game.job
+    loot_m = loot_multiplier(ev, flash)
     drop = await grant_drop(
         session,
         player,
@@ -304,6 +315,7 @@ async def finish_minigame(
         job=game.job,
         event_key=event_key,
         loot_luck=loadout.loot_luck,
+        loot_mult=loot_m,
     )
     if game.job == "mine" and "double_loot_mine" in loadout.charges_ready:
         name = await try_consume_charge(session, player, "double_loot_mine", loadout)
@@ -316,6 +328,7 @@ async def finish_minigame(
                 job="mine",
                 event_key=event_key,
                 loot_luck=loadout.loot_luck + 0.05,
+                loot_mult=loot_m,
             )
             charge_notes.append(f"⚡ {name}: двойной дроп")
             if drop2 and not drop:

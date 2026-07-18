@@ -40,6 +40,7 @@ from services.player import get_or_create_player
 from services.quests import claim_quest
 from services.smuggle import SmuggleError, do_smuggle
 from services.war import raid_candidates
+from services.flash_events import format_flash_event, get_flash_event
 from services.world_events import ensure_daily_event, format_event
 
 CHATWAR_RE = re.compile(r"^(?:война\s+бесед|чатвар)\s+(.+)$", re.IGNORECASE)
@@ -72,9 +73,10 @@ def register(bot: Bot) -> None:
     async def more_menu(message: Message):
         async with SessionLocal() as session:
             ev = await ensure_daily_event(session)
+            flash = await get_flash_event(session)
             await session.commit()
         await reply(message, 
-            f"🎯 Доп. меню\n{format_event(ev)}\n\n"
+            f"🎯 Доп. меню\n{format_event(ev)}\n{format_flash_event(flash)}\n\n"
             "Ивент · квест · аукцион · выборы · война бесед",
             keyboard=more_keyboard().get_json(),
         )
@@ -85,9 +87,10 @@ def register(bot: Bot) -> None:
     async def world_event_handler(message: Message):
         async with SessionLocal() as session:
             ev = await ensure_daily_event(session)
+            flash = await get_flash_event(session)
             await session.commit()
         await reply(message, 
-            f"🌤 Ивент дня\n{format_event(ev)}",
+            f"🌤 Ивент дня\n{format_event(ev)}\n\n{format_flash_event(flash)}",
             keyboard=more_keyboard().get_json(),
         )
 

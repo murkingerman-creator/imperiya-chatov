@@ -107,38 +107,55 @@ def format_event(ev: dict | None) -> str:
     return f"{ev['title']}: {ev['desc']}{left}"
 
 
-def work_multiplier(ev: dict | None) -> float:
-    return float(ev["work_mult"]) if ev else 1.0
+def work_multiplier(*layers: dict | None) -> float:
+    m = 1.0
+    for ev in layers:
+        if ev:
+            m *= float(ev.get("work_mult") or 1.0)
+    return m
 
 
-def tax_modifier(ev: dict | None) -> float:
-    return float(ev.get("tax_add") or 0) if ev else 0.0
+def tax_modifier(*layers: dict | None) -> float:
+    total = 0.0
+    for ev in layers:
+        if ev:
+            total += float(ev.get("tax_add") or 0)
+    return total
 
 
-def raid_multiplier(ev: dict | None) -> float:
-    return float(ev["raid_mult"]) if ev else 1.0
+def raid_multiplier(*layers: dict | None) -> float:
+    m = 1.0
+    for ev in layers:
+        if ev:
+            m *= float(ev.get("raid_mult") or 1.0)
+    return m
 
 
-def loot_multiplier(ev: dict | None) -> float:
-    if not ev:
-        return 1.0
-    return float(ev.get("loot_mult") or 1.0)
+def loot_multiplier(*layers: dict | None) -> float:
+    m = 1.0
+    for ev in layers:
+        if ev:
+            m *= float(ev.get("loot_mult") or 1.0)
+    return m
 
 
-def smuggle_multiplier(ev: dict | None) -> float:
-    if not ev:
-        return 1.0
-    return float(ev.get("smuggle_mult") or 1.0)
+def smuggle_multiplier(*layers: dict | None) -> float:
+    m = 1.0
+    for ev in layers:
+        if ev:
+            m *= float(ev.get("smuggle_mult") or 1.0)
+    return m
 
 
-def raid_blocked(ev: dict | None) -> bool:
-    return bool(ev and ev.get("raid_block"))
+def raid_blocked(*layers: dict | None) -> bool:
+    return any(bool(ev and ev.get("raid_block")) for ev in layers)
 
 
-def raid_cooldown(ev: dict | None) -> timedelta:
-    if ev and ev.get("raid_night"):
+def raid_cooldown(*layers: dict | None) -> timedelta:
+    if any(ev and ev.get("raid_night") for ev in layers):
         return timedelta(minutes=config.RAID_NIGHT_COOLDOWN_MINUTES)
-    hours = config.RAID_COOLDOWN_HOURS
-    if ev:
-        hours = hours * float(ev.get("raid_cd_mult") or 1.0)
+    hours = float(config.RAID_COOLDOWN_HOURS)
+    for ev in layers:
+        if ev:
+            hours *= float(ev.get("raid_cd_mult") or 1.0)
     return timedelta(hours=hours)

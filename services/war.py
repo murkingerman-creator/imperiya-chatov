@@ -17,7 +17,14 @@ from services.player import ensure_aware, utcnow
 from services.roles import can_raid
 from services.season import add_points
 from services.weeklies import add_progress
-from services.world_events import get_active_event, raid_blocked, raid_cooldown, raid_multiplier
+from services.flash_events import get_flash_event
+from services.world_events import (
+    get_active_event,
+    loot_multiplier,
+    raid_blocked,
+    raid_cooldown,
+    raid_multiplier,
+)
 
 
 class WarError(Exception):
@@ -113,7 +120,8 @@ async def raid(
 
     now = utcnow()
     ev = await get_active_event(session)
-    if raid_blocked(ev):
+    flash = await get_flash_event(session)
+    if raid_blocked(ev, flash):
         raise WarError(
             "🕊 Действует мирный договор — рейды временно запрещены."
         )
@@ -121,7 +129,7 @@ async def raid(
     charge_notes: list[str] = []
 
     last = ensure_aware(attacker.last_raid_at)
-    cd = raid_cooldown(ev)
+    cd = raid_cooldown(ev, flash)
 
     # raid_night_once: treat CD as 15 min for this raid check
     if last and "raid_night_once" in loadout.charges_ready:
@@ -251,7 +259,7 @@ async def raid(
     pct = max(config.RAID_STEAL_MIN_PCT * 0.7, min(config.RAID_STEAL_MAX_PCT * 1.15, pct * noise))
 
     stolen = max(config.RAID_MIN_STEAL, int(defender.treasury * pct))
-    stolen = int(stolen * raid_multiplier(ev))
+    stolen = int(stolen * raid_multiplier(ev, flash))
     stolen, _ = apply_raid_modifiers(stolen, loadout)
 
     # доп. срез добычи экипом защиты (поверх уже учтённой силы в шансе)
@@ -313,6 +321,7 @@ async def raid(
         "raid",
         success=True,
         loot_luck=loadout.loot_luck,
+        loot_mult=loot_multiplier(ev, flash),
     )
 
     return {
