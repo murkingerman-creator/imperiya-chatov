@@ -12,11 +12,16 @@ from db.models import Player
 from services.inventory import add_item
 
 
-def _weighted_rarity(rng: random.Random | None = None) -> str:
+def _weighted_rarity(
+    weights: dict[str, float],
+    rng: random.Random | None = None,
+) -> str:
     rng = rng or random
-    weights = config.LOOT_RARITY_WEIGHTS
     keys = list(weights.keys())
-    vals = [weights[k] for k in keys]
+    vals = [float(weights[k]) for k in keys]
+    if sum(vals) <= 0:
+        keys = list(config.LOOT_RARITY_WEIGHTS.keys())
+        vals = [float(config.LOOT_RARITY_WEIGHTS[k]) for k in keys]
     return rng.choices(keys, weights=vals, k=1)[0]
 
 
@@ -29,10 +34,12 @@ def roll_drop(
     loot_luck: float = 0.0,
     loot_mult: float = 1.0,
     force: bool = False,
+    rarity_weights: dict[str, float] | None = None,
     rng: random.Random | None = None,
 ) -> dict | None:
     """Вернуть item dict или None. Не пишет в БД."""
     rng = rng or random
+    weights = rarity_weights or dict(config.LOOT_RARITY_WEIGHTS)
 
     if pool == "smuggle":
         chance = config.LOOT_SMUGGLE_SUCCESS if success else config.LOOT_CHANCE_FAIL
@@ -60,7 +67,7 @@ def roll_drop(
         pools.append("cursed")
 
     for _ in range(8):
-        rarity = _weighted_rarity(rng)
+        rarity = _weighted_rarity(weights, rng)
         candidates = []
         for p in pools:
             candidates.extend(cat.items_in_pool(p, rarity))
@@ -95,6 +102,9 @@ async def grant_drop(
     loot_mult: float = 1.0,
     force_item: dict | None = None,
 ) -> dict | None:
+    from services.loot_settings import get_loot_weights
+
+    rarity_weights, _src = await get_loot_weights(session)
     item = force_item or roll_drop(
         pool,
         success=success,
@@ -102,6 +112,7 @@ async def grant_drop(
         event_key=event_key,
         loot_luck=loot_luck,
         loot_mult=loot_mult,
+        rarity_weights=rarity_weights,
     )
     if not item:
         return None

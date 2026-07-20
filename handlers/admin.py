@@ -42,6 +42,17 @@ from services.flash_events import (
     list_flashes_text,
 )
 from services.world_events import clear_event, force_event, format_event, get_active_event
+from services.loot_settings import (
+    LootSettingsError,
+    format_weights,
+    get_loot_weights,
+    get_wheel_weights,
+    parse_weights_args,
+    reset_loot_weights,
+    reset_wheel_weights,
+    set_loot_weights,
+    set_wheel_weights,
+)
 
 # peer_id + from_id -> mode
 _pending: dict[tuple[int, int], str] = {}
@@ -79,6 +90,7 @@ def _help_text() -> str:
         "• !джекпот СУММА · !дождь Название СУММА\n"
         "• !всем СУММА [текст] · !принять / !отклонить\n"
         "• !багпринять ID · !баготклонить ID [причина]\n"
+        "• !лут / !колесо — веса редкости · !лут сброс\n"
         "🌤 Ивенты · 🎮 Ещё — расширенные действия"
     )
 
@@ -490,6 +502,20 @@ def register(bot: Bot) -> None:
             keyboard=cancel_keyboard().get_json(),
         )
 
+    @bot.on.message(func=payload_cmd("adm_loot"))
+    async def adm_loot(message: Message):
+        if not await _require(message):
+            return
+        async with SessionLocal() as session:
+            loot_w, loot_src = await get_loot_weights(session)
+            wheel_w, wheel_src = await get_wheel_weights(session)
+        text = (
+            format_weights(loot_w, title="🎲 Лут работ/рейдов", source=loot_src)
+            + "\n\n───\n\n"
+            + format_weights(wheel_w, title="🎰 Колесо", source=wheel_src)
+        )
+        await reply(message, text, keyboard=admin_extra_keyboard().get_json())
+
     @bot.on.message(func=payload_cmd("adm_jackpot"))
     async def adm_jackpot_ask(message: Message):
         if not await _require(message):
@@ -845,7 +871,77 @@ async def _handle_commands(message: Message, text: str, lower: str) -> bool:
                 keyboard=admin_extra_keyboard().get_json(),
             )
         return True
+    if lower in {"!лут", "!loot"} or lower.startswith("!лут ") or lower.startswith("!loot "):
+        await _do_loot_cmd(message, text)
+        return True
+    if (
+        lower in {"!колесо", "!wheel"}
+        or lower.startswith("!колесо ")
+        or lower.startswith("!wheel ")
+    ):
+        await _do_wheel_cmd(message, text)
+        return True
     return False
+
+
+async def _do_loot_cmd(message: Message, text: str) -> None:
+    if not await _require(message):
+        return
+    parts = text.split(maxsplit=1)
+    async with SessionLocal() as session:
+        if len(parts) == 1:
+            w, src = await get_loot_weights(session)
+            await reply(
+                message,
+                format_weights(w, title="🎲 Лут работ/рейдов", source=src),
+                keyboard=admin_extra_keyboard().get_json(),
+            )
+            return
+        arg = parts[1].strip().lower()
+        try:
+            if arg in {"сброс", "reset", "default", "дефолт"}:
+                w = await reset_loot_weights(session, admin_id=message.from_id)
+                msg = format_weights(w, title="🎲 Лут сброшен", source="дефолт config")
+            else:
+                partial = parse_weights_args(parts[1])
+                w = await set_loot_weights(
+                    session, partial, admin_id=message.from_id
+                )
+                msg = format_weights(w, title="🎲 Лут обновлён", source="override БД")
+        except LootSettingsError as e:
+            await reply(message, e.message, keyboard=admin_extra_keyboard().get_json())
+            return
+    await reply(message, msg, keyboard=admin_extra_keyboard().get_json())
+
+
+async def _do_wheel_cmd(message: Message, text: str) -> None:
+    if not await _require(message):
+        return
+    parts = text.split(maxsplit=1)
+    async with SessionLocal() as session:
+        if len(parts) == 1:
+            w, src = await get_wheel_weights(session)
+            await reply(
+                message,
+                format_weights(w, title="🎰 Колесо", source=src),
+                keyboard=admin_extra_keyboard().get_json(),
+            )
+            return
+        arg = parts[1].strip().lower()
+        try:
+            if arg in {"сброс", "reset", "default", "дефолт"}:
+                w = await reset_wheel_weights(session, admin_id=message.from_id)
+                msg = format_weights(w, title="🎰 Колесо сброшено", source="дефолт config")
+            else:
+                partial = parse_weights_args(parts[1])
+                w = await set_wheel_weights(
+                    session, partial, admin_id=message.from_id
+                )
+                msg = format_weights(w, title="🎰 Колесо обновлено", source="override БД")
+        except LootSettingsError as e:
+            await reply(message, e.message, keyboard=admin_extra_keyboard().get_json())
+            return
+    await reply(message, msg, keyboard=admin_extra_keyboard().get_json())
 
 
 async def _do_broadcast(

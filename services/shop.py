@@ -307,9 +307,10 @@ async def buy_wheel(
         }
 
     items = cat.all_items()
-    weights = [
-        config.WHEEL_RARITY_WEIGHTS.get(item["rarity"], 0.0) for item in items
-    ]
+    from services.loot_settings import get_wheel_weights
+
+    wheel_w, _ = await get_wheel_weights(session)
+    weights = [wheel_w.get(item["rarity"], 0.0) for item in items]
     if sum(weights) <= 0:
         weights = [1.0] * len(items)
     item = random.choices(items, weights=weights, k=1)[0]
