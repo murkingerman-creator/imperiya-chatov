@@ -239,9 +239,10 @@ def register(bot: Bot) -> None:
         await reply(
             message,
             f"🧹 Слить хлам (common/uncommon, без трофеев колеса)\n"
+            f"Инструменты и рабочие наборы не трогаем.\n"
             f"{sample}{more}\n\n"
             f"Итого: {preview['qty']} шт. → ~{preview['price']} крон\n"
-            f"Rare+ и экип не трогаем.",
+            f"Rare+, экип и инструменты/наборы не трогаем.",
             keyboard=confirm_junk_sell_keyboard(
                 preview["price"], preview["qty"]
             ).get_json(),

@@ -343,13 +343,16 @@ async def preview_sell_price(
 
 
 async def preview_junk_sale(session: AsyncSession, player: Player) -> dict:
-    """Сколько даст слив unbound common/uncommon."""
+    """Сколько даст слив unbound common/uncommon (без инструментов/наборов)."""
     bag = await list_bag(session, player.vk_id)
     total_price = 0
     total_qty = 0
     lines: list[str] = []
     for it, qty in bag:
         if it["rarity"] not in ("common", "uncommon"):
+            continue
+        # инструменты и рабочие наборы — не хлам
+        if it.get("slot") == "tool" or it.get("work_kit_for") or it.get("family") == "work_kit":
             continue
         free = await unbound_qty(session, player.vk_id, it["id"])
         if free <= 0:
@@ -372,7 +375,7 @@ async def preview_junk_sale(session: AsyncSession, player: Player) -> dict:
 
 
 async def sell_junk(session: AsyncSession, player: Player) -> dict:
-    """Продать все unbound common/uncommon (не экип, не rare+). Один commit."""
+    """Продать unbound common/uncommon (не экип, не rare+, не инструменты)."""
     preview = await preview_junk_sale(session, player)
     if preview["qty"] <= 0:
         raise InventoryError("Нечего сливать: нет unbound ordinary/необычных.")
@@ -381,6 +384,8 @@ async def sell_junk(session: AsyncSession, player: Player) -> dict:
     sold = 0
     for it, _qty in bag:
         if it["rarity"] not in ("common", "uncommon"):
+            continue
+        if it.get("slot") == "tool" or it.get("work_kit_for") or it.get("family") == "work_kit":
             continue
         free = await unbound_qty(session, player.vk_id, it["id"])
         if free <= 0:
