@@ -92,6 +92,7 @@ class Player(Base):
     last_farm_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_forge_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_tavern_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_stable_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_smuggle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     daily_streak: Mapped[int] = mapped_column(Integer, default=0)
     last_daily_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

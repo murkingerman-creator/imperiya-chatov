@@ -291,6 +291,114 @@ async def unbound_qty(session: AsyncSession, vk_id: int, item_id: str) -> int:
     return max(0, row.qty - int(row.bound_qty or 0))
 
 
+async def bag_qty(session: AsyncSession, vk_id: int, item_id: str) -> int:
+    result = await session.execute(
+        select(InventoryItem).where(
+            InventoryItem.player_vk_id == vk_id,
+            InventoryItem.item_id == item_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    return int(row.qty) if row else 0
+
+
+async def preview_sell_price(
+    session: AsyncSession, player: Player, item_id: str, qty: int
+) -> dict:
+    """Оценка цены без списания."""
+    it = cat.get_item(item_id)
+    if not it:
+        raise InventoryError("Предмет не найден.")
+    result = await session.execute(
+        select(InventoryItem).where(
+            InventoryItem.player_vk_id == player.vk_id,
+            InventoryItem.item_id == item_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row or row.qty < qty:
+        raise InventoryError("Недостаточно предметов в сумке.")
+    base = cat.SELL_PRICE.get(it["rarity"], 10)
+    bound_qty = int(row.bound_qty or 0)
+    unbound = row.qty - bound_qty
+    sell_unbound = min(qty, unbound)
+    sell_bound = qty - sell_unbound
+    mult = float(config.SHOP_WHEEL_SELL_MULT)
+    price = base * sell_unbound + max(1, int(base * mult)) * sell_bound
+    return {
+        "item": it,
+        "qty": qty,
+        "price": price,
+        "bound_sold": sell_bound,
+    }
+
+
+async def preview_junk_sale(session: AsyncSession, player: Player) -> dict:
+    """Сколько даст слив unbound common/uncommon."""
+    bag = await list_bag(session, player.vk_id)
+    total_price = 0
+    total_qty = 0
+    lines: list[str] = []
+    for it, qty in bag:
+        if it["rarity"] not in ("common", "uncommon"):
+            continue
+        free = await unbound_qty(session, player.vk_id, it["id"])
+        if free <= 0:
+            continue
+        # экип блокирует весь стек при sell_item — пропускаем, если надет
+        eq = await session.execute(
+            select(EquippedItem).where(
+                EquippedItem.player_vk_id == player.vk_id,
+                EquippedItem.item_id == it["id"],
+            )
+        )
+        if eq.scalar_one_or_none():
+            continue
+        base = cat.SELL_PRICE.get(it["rarity"], 10)
+        price = base * free
+        total_price += price
+        total_qty += free
+        lines.append(f"• {it['name']}×{free} → {price}")
+    return {"price": total_price, "qty": total_qty, "lines": lines}
+
+
+async def sell_junk(session: AsyncSession, player: Player) -> dict:
+    """Продать все unbound common/uncommon (не экип, не rare+). Один commit."""
+    preview = await preview_junk_sale(session, player)
+    if preview["qty"] <= 0:
+        raise InventoryError("Нечего сливать: нет unbound ordinary/необычных.")
+    bag = await list_bag(session, player.vk_id)
+    total = 0
+    sold = 0
+    for it, _qty in bag:
+        if it["rarity"] not in ("common", "uncommon"):
+            continue
+        free = await unbound_qty(session, player.vk_id, it["id"])
+        if free <= 0:
+            continue
+        eq = await session.execute(
+            select(EquippedItem).where(
+                EquippedItem.player_vk_id == player.vk_id,
+                EquippedItem.item_id == it["id"],
+            )
+        )
+        if eq.scalar_one_or_none():
+            continue
+        base = cat.SELL_PRICE.get(it["rarity"], 10)
+        price = base * free
+        await _dec_bag(session, player.vk_id, it["id"], free)
+        total += price
+        sold += free
+    player.crowns += total
+    await session.commit()
+    return {
+        "price": total,
+        "qty": sold,
+        "crowns": player.crowns,
+        "lines": preview["lines"],
+    }
+
+
 async def sell_item(session: AsyncSession, player: Player, item_id: str, qty: int = 1) -> dict:
     it = cat.get_item(item_id)
     if not it:

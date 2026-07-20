@@ -1,16 +1,17 @@
 from vkbottle.bot import Bot, Message
 
 from bot import config
-from bot.keyboards import main_keyboard
+from bot.keyboards import main_keyboard, profile_keyboard, shop_keyboard
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
-from handlers.rules import match_cmd
+from handlers.rules import match_cmd, payload_cmd
 from services.achievements import format_titles
 from services.cataclysm import format_cataclysm, get_cataclysm
 from services.empire import format_empire_line, get_empire_status
 from services.inventory import discovered_count, get_equipped
 from services.levels import format_level_line, sync_level
 from services.professions import format_professions_line
+from services.shop import jail_minutes_left, shop_root_text
 from services.tax_week import tax_paid_display
 from services.player import (
     energy_next_in_minutes,
@@ -97,7 +98,7 @@ def register(bot: Bot) -> None:
             text = (
                 f"👤 {player.name}\n"
                 f"{format_level_line(player)}\n"
-                f"💰 Кроны: {player.crowns}\n"
+                f"💰 Личные кроны: {player.crowns} · 🏪 чтобы потратить\n"
                 f"🏛 Налог в казну (неделя МСК): {tax_paid_display(player)}\n"
                 f"⚡ Энергия: {player.energy}/{config.MAX_ENERGY} ({energy_hint})\n"
                 f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"
@@ -113,4 +114,23 @@ def register(bot: Bot) -> None:
                 f"{format_event(ev)}\n"
                 f"{format_flash_event(flash)}"
             )
-            await reply(message, text, keyboard=main_keyboard().get_json())
+            await reply(message, text, keyboard=profile_keyboard().get_json())
+
+    @bot.on.message(func=payload_cmd("profile_spend"))
+    async def profile_spend(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            regenerate_energy(player)
+            await session.commit()
+            text = (
+                "💰 Твои личные кроны (не казна страны).\n\n"
+                + shop_root_text(player)
+            )
+            await reply(
+                message,
+                text,
+                keyboard=shop_keyboard(
+                    jailed=jail_minutes_left(player) > 0
+                ).get_json(),
+            )

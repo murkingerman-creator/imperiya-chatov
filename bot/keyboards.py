@@ -11,6 +11,18 @@ def _inline_json(kb: Keyboard) -> str:
     return json.dumps(data, ensure_ascii=False)
 
 
+def profile_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(
+        Text("🏪 Тратить кроны", {"cmd": "profile_spend"}),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(Text("🎒 Сумка", {"cmd": "bag"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
 def main_keyboard(*, is_admin: bool = False) -> Keyboard:
     kb = Keyboard(one_time=False, inline=False)
     kb.add(Text("👤 Профиль", {"cmd": "profile"}), color=KeyboardButtonColor.PRIMARY)
@@ -388,7 +400,9 @@ def jobs_keyboard(level: int = 1) -> Keyboard:
     _job("🔥 Кузня", "forge", KeyboardButtonColor.PRIMARY)
     _job("🍺 Таверна", "tavern", KeyboardButtonColor.POSITIVE)
     kb.row()
+    _job("🐴 Конюшня", "stable", KeyboardButtonColor.PRIMARY)
     _job("🛡 Охрана", "guard", KeyboardButtonColor.NEGATIVE)
+    kb.row()
     if level >= config.SMUGGLE_LEVEL_REQ:
         kb.add(Text("🕶 Контрабанда", {"cmd": "smuggle"}), color=KeyboardButtonColor.NEGATIVE)
     else:
@@ -667,6 +681,10 @@ def bag_keyboard(page: int = 0, has_next: bool = False) -> Keyboard:
     kb.add(Text("⚡ Заряды", {"cmd": "bag_charges"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("🛒 Торг", {"cmd": "market_menu"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
+    kb.add(
+        Text("🧹 Слить хлам", {"cmd": "bag_junk"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -691,6 +709,10 @@ def bag_items_keyboard(items: list[tuple], page: int, has_next: bool = False) ->
     kb.add(Text("⚡ Заряды", {"cmd": "bag_charges"}), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text("🛒 Торг", {"cmd": "market_menu"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
+    kb.add(
+        Text("🧹 Слить хлам", {"cmd": "bag_junk"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
@@ -712,19 +734,41 @@ def item_actions_keyboard(item_id: str, rarity: str) -> Keyboard:
     return kb
 
 
-def confirm_sell_bot_keyboard(item_id: str, price: int) -> Keyboard:
+def confirm_sell_bot_keyboard(item_id: str, price_one: int, qty_all: int, price_all: int) -> Keyboard:
     kb = Keyboard(one_time=True, inline=False)
     kb.add(
         Text(
-            f"Да, продать за {price}",
-            {"cmd": "bag_sell_confirm", "id": item_id},
+            f"×1 за {price_one}",
+            {"cmd": "bag_sell_confirm", "id": item_id, "qty": 1},
         ),
         color=KeyboardButtonColor.POSITIVE,
     )
+    if qty_all > 1:
+        kb.add(
+            Text(
+                f"Все ×{qty_all} за {price_all}",
+                {"cmd": "bag_sell_confirm", "id": item_id, "qty": qty_all},
+            ),
+            color=KeyboardButtonColor.PRIMARY,
+        )
+    kb.row()
     kb.add(
         Text("❌ Отмена", {"cmd": "bag_item", "id": item_id}),
         color=KeyboardButtonColor.NEGATIVE,
     )
+    return kb
+
+
+def confirm_junk_sell_keyboard(price: int, qty: int) -> Keyboard:
+    kb = Keyboard(one_time=True, inline=False)
+    kb.add(
+        Text(
+            f"Слить {qty} шт. за {price}",
+            {"cmd": "bag_junk_confirm"},
+        ),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(Text("❌ Отмена", {"cmd": "bag"}), color=KeyboardButtonColor.NEGATIVE)
     return kb
 
 

@@ -38,6 +38,7 @@ def _job_last_attr(job: str) -> str:
         "farm": "last_farm_at",
         "forge": "last_forge_at",
         "tavern": "last_tavern_at",
+        "stable": "last_stable_at",
     }
     if job not in mapping:
         raise WorkError("Неизвестная работа.")
@@ -165,6 +166,26 @@ def _build_minigame(job: str) -> tuple[str, str, list[tuple[str, str]], dict]:
             "choice",
             [("🍺 Эль", "ale"), ("🎵 Песня", "song"), ("🃏 Сделка", "deal")],
             {"mode": "tavern"},
+        )
+
+    if job == "stable":
+        hour_seed = int(utcnow().timestamp() // 3600)
+        mood = ["restless", "hungry", "dirty"][hour_seed % 3]
+        labels = {
+            "restless": "🐴 Конь беспокойный — нужен выгул",
+            "hungry": "🐴 Конь голоден — покорми",
+            "dirty": "🐴 Шерсть в грязи — вычисти",
+        }
+        correct = {"restless": "walk", "hungry": "feed", "dirty": "groom"}[mood]
+        return (
+            f"🐴 Имперская конюшня\n{labels[mood]}\nЧто сделать?",
+            correct,
+            [
+                ("🧹 Вычистить", "groom"),
+                ("🚶 Выгул", "walk"),
+                ("🥕 Покормить", "feed"),
+            ],
+            {"mode": "stable", "mood": mood},
         )
 
     raise WorkError("Неизвестная работа.")
@@ -341,7 +362,7 @@ def _resolve_answer(game: MiniSession, answer: str) -> dict:
             }
         return {"success": False, "note": "Упустил момент."}
 
-    # simple / memory / weather
+    # simple / memory / weather / stable
     ok = answer == game.correct
     return {
         "success": ok,

@@ -4,6 +4,7 @@ from bot.keyboards import (
     bag_items_keyboard,
     bag_keyboard,
     charge_activate_keyboard,
+    confirm_junk_sell_keyboard,
     confirm_sell_bot_keyboard,
     item_actions_keyboard,
     main_keyboard,
@@ -17,13 +18,17 @@ from services.charges import MANUAL_CHARGES, ChargeError, activate_manual_charge
 from services.chronicle_store import add_event
 from services.inventory import (
     InventoryError,
+    bag_qty,
     discovered_count,
     donate_item,
     equip,
     get_equipped,
     list_bag,
     merge_commons,
+    preview_junk_sale,
+    preview_sell_price,
     sell_item,
+    sell_junk,
     unbound_qty,
     unequip,
     upgrade_equipped,
@@ -156,47 +161,106 @@ def register(bot: Bot) -> None:
         if not it:
             await reply(message, "Предмет не найден.", keyboard=bag_keyboard().get_json())
             return
-        base = cat.SELL_PRICE.get(it["rarity"], 10)
         name = await resolve_name(message)
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
-            free = await unbound_qty(session, player.vk_id, item_id)
-        if free >= 1:
-            price = base
-            hint = ""
-        else:
-            from bot import config as _cfg
-
-            price = max(1, int(base * _cfg.SHOP_WHEEL_SELL_MULT))
-            hint = " (трофей колеса, уценка)"
+            try:
+                qty_all = await bag_qty(session, player.vk_id, item_id)
+                if qty_all < 1:
+                    raise InventoryError("Нет такого в сумке.")
+                one = await preview_sell_price(session, player, item_id, 1)
+                all_p = (
+                    await preview_sell_price(session, player, item_id, qty_all)
+                    if qty_all > 1
+                    else one
+                )
+            except InventoryError as e:
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
+                return
+        hint = ""
+        if one.get("bound_sold"):
+            hint = " (есть трофеи колеса — уценка)"
         await reply(
             message,
             f"💰 Продажа боту\n"
-            f"{cat.format_item(it)}\n"
-            f"Цена: {price} крон{hint}\n\n"
-            f"Точно продать?",
-            keyboard=confirm_sell_bot_keyboard(item_id, price).get_json(),
+            f"{cat.format_item(it)} × до {qty_all}\n"
+            f"×1 → {one['price']} крон · все → {all_p['price']} крон{hint}\n\n"
+            f"Сколько продать?",
+            keyboard=confirm_sell_bot_keyboard(
+                item_id, one["price"], qty_all, all_p["price"]
+            ).get_json(),
         )
 
     @bot.on.message(func=payload_cmd("bag_sell_confirm"))
     async def bag_sell_confirm(message: Message):
         payload = message.get_payload_json() or {}
         item_id = str(payload.get("id") or "")
+        raw_qty = payload.get("qty", 1)
         name = await resolve_name(message)
         async with SessionLocal() as session:
             player = await get_or_create_player(session, message.from_id, name)
             try:
-                result = await sell_item(session, player, item_id, 1)
+                if raw_qty == "all" or str(raw_qty) == "all":
+                    qty = await bag_qty(session, player.vk_id, item_id)
+                else:
+                    qty = max(1, int(raw_qty or 1))
+                result = await sell_item(session, player, item_id, qty)
             except InventoryError as e:
                 await reply(message, e.message, keyboard=bag_keyboard().get_json())
                 return
             note = ""
             if result.get("bound_sold"):
-                note = " (трофей колеса, уценка)\n"
+                note = " (трофей колеса, уценка)"
             await reply(
                 message,
-                f"Продано: {cat.format_item(result['item'])} → +{result['price']}"
-                f"{note}\n💰 {result['crowns']}",
+                f"Продано: {cat.format_item(result['item'])} ×{result['qty']} "
+                f"→ +{result['price']}{note}\n💰 {result['crowns']}",
+                keyboard=bag_keyboard().get_json(),
+            )
+
+    @bot.on.message(func=payload_cmd("bag_junk"))
+    async def bag_junk(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            preview = await preview_junk_sale(session, player)
+        if preview["qty"] <= 0:
+            await reply(
+                message,
+                "🧹 Нечего сливать.\n"
+                "Сливаются только unbound ordinary/необычные (не экип, не rare+).",
+                keyboard=bag_keyboard().get_json(),
+            )
+            return
+        sample = "\n".join(preview["lines"][:8])
+        more = ""
+        if len(preview["lines"]) > 8:
+            more = f"\n… и ещё {len(preview['lines']) - 8}"
+        await reply(
+            message,
+            f"🧹 Слить хлам (common/uncommon, без трофеев колеса)\n"
+            f"{sample}{more}\n\n"
+            f"Итого: {preview['qty']} шт. → ~{preview['price']} крон\n"
+            f"Rare+ и экип не трогаем.",
+            keyboard=confirm_junk_sell_keyboard(
+                preview["price"], preview["qty"]
+            ).get_json(),
+        )
+
+    @bot.on.message(func=payload_cmd("bag_junk_confirm"))
+    async def bag_junk_confirm(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                result = await sell_junk(session, player)
+            except InventoryError as e:
+                await reply(message, e.message, keyboard=bag_keyboard().get_json())
+                return
+            await reply(
+                message,
+                f"🧹 Слито {result['qty']} шт. → +{result['price']}\n"
+                f"💰 {result['crowns']}",
                 keyboard=bag_keyboard().get_json(),
             )
 

@@ -111,6 +111,15 @@ JOBS = {
         "fail_mult": 0.5,
         "loot_pool": "market",
     },
+    "stable": {
+        "title": "🐴 Конюшня",
+        "cooldown_min": 20,
+        "reward_min": 24,
+        "reward_max": 52,
+        "success_mult": 1.25,
+        "fail_mult": 0.55,
+        "loot_pool": "market",
+    },
 }
 
 # Ранги профессий (пороги счётчика работ)
@@ -433,6 +442,7 @@ JOB_LEVEL_REQ = {
     "tavern": 1,
     "fish": 1,
     "farm": 2,
+    "stable": 3,
     "market": 3,
     "mine": 4,
     "forge": 5,

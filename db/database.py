@@ -21,6 +21,7 @@ _PLAYER_COLS = {
     "last_farm_at": "DATETIME",
     "last_forge_at": "DATETIME",
     "last_tavern_at": "DATETIME",
+    "last_stable_at": "DATETIME",
     "last_smuggle_at": "DATETIME",
     "daily_streak": "INTEGER DEFAULT 0",
     "last_daily_at": "DATETIME",

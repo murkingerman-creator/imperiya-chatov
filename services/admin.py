@@ -140,6 +140,7 @@ def _clear_cd_fields(p: Player) -> None:
     p.last_farm_at = None
     p.last_forge_at = None
     p.last_tavern_at = None
+    p.last_stable_at = None
     p.last_smuggle_at = None
     p.last_daily_at = None
     p.nation_left_at = None

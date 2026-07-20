@@ -89,6 +89,7 @@ async def nation_manpower(session: AsyncSession, nation_id: int) -> dict:
         "last_farm_at",
         "last_forge_at",
         "last_tavern_at",
+        "last_stable_at",
         "last_smuggle_at",
     )
     active = sum(
