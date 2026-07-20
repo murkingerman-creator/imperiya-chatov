@@ -185,25 +185,48 @@ async def try_consume_charge(
 
 
 async def get_buff(session: AsyncSession, vk_id: int, code: str) -> PlayerBuff | None:
+    from services.player import ensure_aware, utcnow
+
     result = await session.execute(
         select(PlayerBuff).where(
             PlayerBuff.player_vk_id == vk_id,
             PlayerBuff.buff_code == code,
         )
     )
-    return result.scalar_one_or_none()
+    buff = result.scalar_one_or_none()
+    if not buff:
+        return None
+    exp = ensure_aware(buff.expires_at)
+    if exp and exp <= utcnow():
+        await session.delete(buff)
+        await session.commit()
+        return None
+    return buff
 
 
 async def set_buff(
-    session: AsyncSession, vk_id: int, code: str, stacks: int, meta: str = ""
+    session: AsyncSession,
+    vk_id: int,
+    code: str,
+    stacks: int,
+    meta: str = "",
+    *,
+    expires_at=None,
 ) -> None:
     buff = await get_buff(session, vk_id, code)
     if buff:
         buff.stacks = stacks
         buff.meta = meta
+        buff.expires_at = expires_at
     else:
         session.add(
-            PlayerBuff(player_vk_id=vk_id, buff_code=code, stacks=stacks, meta=meta)
+            PlayerBuff(
+                player_vk_id=vk_id,
+                buff_code=code,
+                stacks=stacks,
+                meta=meta,
+                expires_at=expires_at,
+            )
         )
     await session.commit()
 

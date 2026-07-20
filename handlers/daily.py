@@ -1,5 +1,6 @@
 from vkbottle.bot import Bot, Message
 
+from bot import config
 from bot.keyboards import main_keyboard, onboarding_keyboard
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
@@ -23,18 +24,32 @@ def register(bot: Bot) -> None:
                 await reply(message, e.message, keyboard=main_keyboard().get_json())
                 return
 
-            titles = await check_streak(session, player)
-            title_line = f"\n🏅 {', '.join(titles)}" if titles else ""
-            from services.levels import add_xp
-
-            xp_info = await add_xp(session, player, config.XP_DAILY, reason="ежедневка")
+            # Награда уже в БД — ответ игроку не должен пропасть из‑за XP/титулов
+            title_line = ""
             xp_line = ""
-            if xp_info.get("level_ups"):
-                xp_line = "\n" + "\n".join(xp_info["level_ups"])
-            elif xp_info.get("gained"):
-                xp_line = f"\n⭐ +{xp_info['gained']} XP"
-            onboard = await advance_onboarding(session, player, "daily")
-            onboard_line = f"\n{onboard}" if onboard else ""
+            onboard_line = ""
+            try:
+                titles = await check_streak(session, player)
+                if titles:
+                    title_line = f"\n🏅 {', '.join(titles)}"
+                from services.levels import add_xp
+
+                xp_info = await add_xp(
+                    session, player, config.XP_DAILY, reason="ежедневка"
+                )
+                if xp_info.get("level_ups"):
+                    xp_line = "\n" + "\n".join(xp_info["level_ups"])
+                elif xp_info.get("gained"):
+                    xp_line = f"\n⭐ +{xp_info['gained']} XP"
+                onboard = await advance_onboarding(session, player, "daily")
+                if onboard:
+                    onboard_line = f"\n{onboard}"
+            except Exception:
+                xp_line = (
+                    "\n⚠ Бонус XP мог не начислиться — кроны уже на балансе "
+                    "(👤 Профиль)."
+                )
+
             text = (
                 f"🎁 Ежедневка получена!\n"
                 f"+{result['reward']} крон "

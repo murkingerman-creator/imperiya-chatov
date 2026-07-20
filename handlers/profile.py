@@ -11,6 +11,7 @@ from services.empire import format_empire_line, get_empire_status
 from services.inventory import discovered_count, get_equipped
 from services.levels import format_level_line, sync_level
 from services.professions import format_professions_line
+from services.tax_week import tax_paid_display
 from services.player import (
     energy_next_in_minutes,
     ensure_aware,
@@ -97,6 +98,7 @@ def register(bot: Bot) -> None:
                 f"👤 {player.name}\n"
                 f"{format_level_line(player)}\n"
                 f"💰 Кроны: {player.crowns}\n"
+                f"🏛 Налог в казну (неделя МСК): {tax_paid_display(player)}\n"
                 f"⚡ Энергия: {player.energy}/{config.MAX_ENERGY} ({energy_hint})\n"
                 f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"
                 f"🏅 Титулы: {format_titles(player)}\n"

@@ -84,6 +84,32 @@ def more_keyboard() -> Keyboard:
 
 
 def shop_keyboard(*, jailed: bool = False) -> Keyboard:
+    """Корень лавки: роли крон."""
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(
+        Text("🏠 Быт", {"cmd": "shop_cat", "cat": "byt"}),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(
+        Text("⚔ Война", {"cmd": "shop_cat", "cat": "war"}),
+        color=KeyboardButtonColor.NEGATIVE,
+    )
+    kb.row()
+    kb.add(
+        Text("👑 Престиж", {"cmd": "shop_cat", "cat": "prestige"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
+    if jailed:
+        kb.add(
+            Text("🔓 Выкуп", {"cmd": "shop_buy", "item": "bail"}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+    kb.row()
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def shop_byt_keyboard(*, jailed: bool = False) -> Keyboard:
     kb = Keyboard(one_time=False, inline=False)
     if jailed:
         kb.add(
@@ -100,30 +126,55 @@ def shop_keyboard(*, jailed: bool = False) -> Keyboard:
         color=KeyboardButtonColor.POSITIVE,
     )
     kb.row()
-    kb.add(
-        Text("🏛 В казну", {"cmd": "shop_buy", "item": "treasury"}),
-        color=KeyboardButtonColor.PRIMARY,
-    )
-    kb.add(
-        Text("⚔ Знамя", {"cmd": "shop_buy", "item": "raid_bless"}),
-        color=KeyboardButtonColor.NEGATIVE,
-    )
-    kb.row()
-    kb.add(
-        Text("🎰 Колесо", {"cmd": "shop_buy", "item": "wheel"}),
-        color=KeyboardButtonColor.POSITIVE,
-    )
-    kb.add(
-        Text("🛡 Щит", {"cmd": "tr_spend", "action": "shield_pay"}),
-        color=KeyboardButtonColor.PRIMARY,
-    )
-    kb.row()
     if not jailed:
         kb.add(
             Text("🔓 Выкуп", {"cmd": "shop_buy", "item": "bail"}),
             color=KeyboardButtonColor.SECONDARY,
         )
-    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def shop_war_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(
+        Text("⚔ Знамя", {"cmd": "shop_buy", "item": "raid_bless"}),
+        color=KeyboardButtonColor.NEGATIVE,
+    )
+    kb.add(
+        Text("🗡 Наёмник", {"cmd": "shop_buy", "item": "hire_blade"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
+    kb.row()
+    kb.add(
+        Text("🛡 Щит", {"cmd": "tr_spend", "action": "shield_pay"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
+    kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def shop_prestige_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(
+        Text("🏛 В казну", {"cmd": "shop_buy", "item": "treasury"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
+    kb.add(
+        Text("🕯 Подношение", {"cmd": "shop_buy", "item": "tribute"}),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.row()
+    kb.add(
+        Text("📜 Лицензия", {"cmd": "shop_buy", "item": "craft_license"}),
+        color=KeyboardButtonColor.PRIMARY,
+    )
+    kb.add(
+        Text("🎰 Колесо", {"cmd": "shop_buy", "item": "wheel"}),
+        color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.row()
+    kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 

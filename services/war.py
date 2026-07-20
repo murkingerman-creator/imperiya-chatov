@@ -249,6 +249,14 @@ async def raid(
         charge_notes.append(
             f"⚔ Знамя рейда: +{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс"
         )
+    if await consume_buff_stack(session, leader.vk_id, "hire_blade"):
+        chance = min(
+            config.RAID_WIN_CHANCE_MAX,
+            chance + config.SHOP_HIRE_BLADE_BONUS,
+        )
+        charge_notes.append(
+            f"🗡 Наёмник: +{int(config.SHOP_HIRE_BLADE_BONUS * 100)}% шанс"
+        )
     if await consume_buff_stack(session, leader.vk_id, "raid_levy"):
         chance = min(
             config.RAID_WIN_CHANCE_MAX,

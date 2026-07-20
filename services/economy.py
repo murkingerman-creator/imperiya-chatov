@@ -468,6 +468,17 @@ async def finish_minigame(
         gross = max(1, int(gross * (1.0 + prof_b)))
         charge_notes.append(f"🏅 Ранг профессии: +{int(prof_b * 100)}%")
 
+    if await consume_buff_stack(session, player.vk_id, "craft_boost"):
+        craft_b = float(config.SHOP_CRAFT_LICENSE_BONUS)
+        gross = max(1, int(gross * (1.0 + craft_b)))
+        charge_notes.append(f"📜 Лицензия мастерства: +{int(craft_b * 100)}%")
+
+    tribute = await get_buff(session, player.vk_id, "tribute_work")
+    if tribute:
+        trib_b = float(config.SHOP_TRIBUTE_WORK_BONUS)
+        gross = max(1, int(gross * (1.0 + trib_b)))
+        charge_notes.append(f"🕯 Подношение трону: +{int(trib_b * 100)}%")
+
     cata = await get_cataclysm(session)
     cata_w = cataclysm_work_mult(cata)
     if cata_w != 1.0:
@@ -534,6 +545,9 @@ async def finish_minigame(
         tax_rate = max(0.0, min(0.4, tax_rate))
         tax = max(1, int(gross * tax_rate))
         player.nation.treasury += tax
+        from services.tax_week import add_tax_paid
+
+        add_tax_paid(player, tax)
         if success and game.job == "guard":
             treasury_bonus = int(spec.get("treasury_bonus", 0)) + loadout.treasury_bonus_add
             player.nation.treasury += treasury_bonus

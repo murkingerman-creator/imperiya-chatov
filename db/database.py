@@ -42,6 +42,8 @@ _PLAYER_COLS = {
     "level": "INTEGER DEFAULT 1",
     "last_wheel_at": "DATETIME",
     "job_counts": "VARCHAR(512) DEFAULT ''",
+    "tax_paid_week": "INTEGER DEFAULT 0",
+    "tax_week_key": "VARCHAR(16) DEFAULT ''",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",

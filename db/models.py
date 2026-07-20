@@ -119,6 +119,8 @@ class Player(Base):
     )
     # mine=12,fish=3 — счётчики для рангов профессий
     job_counts: Mapped[str] = mapped_column(String(512), default="")
+    tax_paid_week: Mapped[int] = mapped_column(Integer, default=0)
+    tax_week_key: Mapped[str] = mapped_column(String(16), default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

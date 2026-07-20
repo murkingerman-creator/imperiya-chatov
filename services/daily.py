@@ -26,7 +26,10 @@ async def claim_daily(session: AsyncSession, player: Player) -> dict:
 
     last = ensure_aware(player.last_daily_at)
     if last and _msk_date(last) == today:
-        raise DailyError("Ежедневка уже получена сегодня. Завтра снова!")
+        raise DailyError(
+            "Ежедневка уже получена сегодня.\n"
+            "Следующая — после 00:00 МСК."
+        )
 
     streak = player.daily_streak or 0
     if last:

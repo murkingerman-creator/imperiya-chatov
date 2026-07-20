@@ -1,8 +1,9 @@
-"""Имперская лавка: трата крон (выкуп, энергия, баффы, вклад в казну)."""
+"""Имперская лавка: роли Быт / Война / Престиж."""
 
 from __future__ import annotations
 
 import random
+from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,33 +36,71 @@ def bail_cost(player: Player) -> int | None:
     return max(config.SHOP_BAIL_MIN, min(config.SHOP_BAIL_MAX, raw))
 
 
-def shop_catalog_text(player: Player) -> str:
+def shop_root_text(player: Player) -> str:
+    regenerate_energy(player)
+    return (
+        "🏪 Имперская лавка — реформа крон\n\n"
+        "Крона больше не «просто число». Трать по ролям:\n"
+        "🏠 Быт — жить и работать\n"
+        "⚔ Война — бить и защищаться\n"
+        "👑 Престиж — казна, слава, азарт\n\n"
+        f"💰 У тебя: {player.crowns} крон · "
+        f"⚡ {player.energy}/{config.MAX_ENERGY}"
+    )
+
+
+def shop_catalog_byt(player: Player) -> str:
     left = jail_minutes_left(player)
     bail = bail_cost(player)
     bail_line = (
-        f"🔓 Выкуп из тюрьмы — {bail} крон (~{left} мин осталось)\n"
+        f"🔓 Выкуп из тюрьмы — {bail} крон (~{left} мин)\n"
         if bail
         else "🔓 Выкуп — сейчас не в тюрьме\n"
     )
     return (
-        "🏪 Имперская лавка\n"
-        "Кроны можно тратить здесь — не только на торг.\n\n"
+        "🏠 Быт — зачем: энергия, свобода, удача на работах\n\n"
         f"{bail_line}"
         f"⚡ Эликсир энергии — {config.SHOP_ENERGY_FULL_COST} "
         f"(полная ⚡ до {config.MAX_ENERGY})\n"
         f"🍀 Печать удачи — {config.SHOP_WORK_LUCK_COST} "
-        f"(+{int(config.SHOP_WORK_LUCK_BONUS * 100)}% к "
-        f"{config.SHOP_WORK_LUCK_STACKS} работам)\n"
-        f"🏛 Вклад в казну — {config.SHOP_TREASURY_GIFT} "
-        f"(твои кроны → казна страны)\n"
+        f"(+{int(config.SHOP_WORK_LUCK_BONUS * 100)}% × "
+        f"{config.SHOP_WORK_LUCK_STACKS} работ)\n\n"
+        f"💰 {player.crowns} · ⚡ {player.energy}/{config.MAX_ENERGY}"
+    )
+
+
+def shop_catalog_war(player: Player) -> str:
+    return (
+        "⚔ Война — зачем: шанс рейда и щит страны\n\n"
         f"⚔ Знамя рейда — {config.SHOP_RAID_BLESS_COST} "
-        f"(+{int(config.SHOP_RAID_BLESS_BONUS * 100)}% шанс к следующему рейду)\n"
+        f"(лидер: +{int(config.SHOP_RAID_BLESS_BONUS * 100)}% к следующему рейду)\n"
+        f"🗡 Контракт наёмника — {config.SHOP_HIRE_BLADE} "
+        f"(+{int(config.SHOP_HIRE_BLADE_BONUS * 100)}% к одному рейду лидера)\n"
+        f"🛡 Взнос в щит страны — {config.NATION_SHIELD_CONTRIB}\n\n"
+        f"💰 {player.crowns}"
+    )
+
+
+def shop_catalog_prestige(player: Player) -> str:
+    return (
+        "👑 Престиж — зачем: казна, мастерство, азарт\n\n"
+        f"🏛 Вклад в казну — {config.SHOP_TREASURY_GIFT}\n"
+        f"🕯 Подношение трону — {config.SHOP_TRIBUTE} "
+        f"(в казну + {int(config.SHOP_TRIBUTE_WORK_BONUS * 100)}% работы "
+        f"на {config.SHOP_TRIBUTE_HOURS}ч)\n"
+        f"📜 Лицензия мастерства — {config.SHOP_CRAFT_LICENSE} "
+        f"(+{int(config.SHOP_CRAFT_LICENSE_BONUS * 100)}% к "
+        f"{config.SHOP_CRAFT_LICENSE_STACKS} работам)\n"
         f"🎰 Колесо удачи — {config.SHOP_WHEEL_COST} "
         f"(кд {config.SHOP_WHEEL_COOLDOWN_SEC} сек; "
-        f"выкуп трофеев −{int((1 - config.SHOP_WHEEL_SELL_MULT) * 100)}%)\n"
-        f"🛡 Взнос в щит страны — {config.NATION_SHIELD_CONTRIB}\n\n"
-        f"У тебя: {player.crowns} крон · ⚡ {player.energy}/{config.MAX_ENERGY}"
+        f"выкуп трофеев −{int((1 - config.SHOP_WHEEL_SELL_MULT) * 100)}%)\n\n"
+        f"💰 {player.crowns}"
     )
+
+
+def shop_catalog_text(player: Player) -> str:
+    """Совместимость: полный каталог."""
+    return shop_root_text(player)
 
 
 async def buy_bail(session: AsyncSession, player: Player) -> dict:
@@ -156,6 +195,74 @@ async def buy_raid_bless(session: AsyncSession, player: Player) -> dict:
     }
 
 
+async def buy_tribute(session: AsyncSession, player: Player) -> dict:
+    cost = int(config.SHOP_TRIBUTE)
+    if not player.nation_id or not player.nation:
+        raise ShopError("Нужна страна для подношения трону.")
+    if player.crowns < cost:
+        raise ShopError(f"Нужно {cost} крон (у тебя {player.crowns}).")
+    player.crowns -= cost
+    player.nation.treasury += cost
+    hours = int(config.SHOP_TRIBUTE_HOURS)
+    await set_buff(
+        session,
+        player.vk_id,
+        "tribute_work",
+        1,
+        meta="tribute",
+        expires_at=utcnow() + timedelta(hours=hours),
+    )
+    await session.commit()
+    return {
+        "cost": cost,
+        "treasury": player.nation.treasury,
+        "nation": f"{player.nation.flag_emoji} {player.nation.name}",
+        "bonus_pct": int(config.SHOP_TRIBUTE_WORK_BONUS * 100),
+        "hours": hours,
+        "crowns": player.crowns,
+    }
+
+
+async def buy_craft_license(session: AsyncSession, player: Player) -> dict:
+    cost = int(config.SHOP_CRAFT_LICENSE)
+    if player.crowns < cost:
+        raise ShopError(f"Нужно {cost} крон (у тебя {player.crowns}).")
+    existing = await get_buff(session, player.vk_id, "craft_boost")
+    if existing and existing.stacks >= int(config.SHOP_CRAFT_LICENSE_STACKS) * 2:
+        raise ShopError("Слишком много лицензий — сначала отработай.")
+    player.crowns -= cost
+    stacks = int(config.SHOP_CRAFT_LICENSE_STACKS)
+    if existing and existing.stacks > 0:
+        stacks = existing.stacks + stacks
+    await set_buff(session, player.vk_id, "craft_boost", stacks)
+    await session.commit()
+    return {
+        "cost": cost,
+        "stacks": stacks,
+        "bonus_pct": int(config.SHOP_CRAFT_LICENSE_BONUS * 100),
+        "crowns": player.crowns,
+    }
+
+
+async def buy_hire_blade(session: AsyncSession, player: Player) -> dict:
+    cost = int(config.SHOP_HIRE_BLADE)
+    if not player.nation_id:
+        raise ShopError("Нужна страна.")
+    if player.crowns < cost:
+        raise ShopError(f"Нужно {cost} крон (у тебя {player.crowns}).")
+    existing = await get_buff(session, player.vk_id, "hire_blade")
+    if existing and existing.stacks > 0:
+        raise ShopError("Контракт уже висит — сначала рейд (нужен лидер с контрактом).")
+    player.crowns -= cost
+    await set_buff(session, player.vk_id, "hire_blade", 1)
+    await session.commit()
+    return {
+        "cost": cost,
+        "bonus_pct": int(config.SHOP_HIRE_BLADE_BONUS * 100),
+        "crowns": player.crowns,
+    }
+
+
 async def buy_wheel(
     session: AsyncSession,
     player: Player,
@@ -174,9 +281,8 @@ async def buy_wheel(
     player.crowns -= spin_cost
     player.last_wheel_at = utcnow()
 
-    # empty / crowns / item — дом в плюсе (~35–40%)
     reward_type = random.choices(
-        ("empty", "crowns", "item"), weights=(12, 53, 35), k=1
+        ("empty", "crowns", "item"), weights=(15, 50, 35), k=1
     )[0]
 
     if reward_type == "empty":
@@ -189,7 +295,7 @@ async def buy_wheel(
 
     if reward_type == "crowns":
         amount = random.choices(
-            (20, 35, 50, 90, 180), weights=(30, 30, 22, 13, 5), k=1
+            (15, 30, 45, 80, 150), weights=(32, 30, 22, 12, 4), k=1
         )[0]
         player.crowns += amount
         await session.commit()
