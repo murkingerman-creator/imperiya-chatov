@@ -45,6 +45,9 @@ _PLAYER_COLS = {
     "job_counts": "VARCHAR(512) DEFAULT ''",
     "tax_paid_week": "INTEGER DEFAULT 0",
     "tax_week_key": "VARCHAR(16) DEFAULT ''",
+    "work_path": "VARCHAR(32) DEFAULT ''",
+    "last_deep_work_at": "DATETIME",
+    "order_progress": "VARCHAR(256) DEFAULT ''",
 }
 _NATION_COLS = {
     "emblem_emoji": "VARCHAR(16) DEFAULT '⚔️'",
@@ -87,6 +90,7 @@ _EQUIPPED_COLS = {
 }
 _INVENTORY_COLS = {
     "bound_qty": "INTEGER DEFAULT 0",
+    "durability": "INTEGER",
 }
 
 

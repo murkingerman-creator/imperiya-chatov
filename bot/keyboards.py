@@ -138,12 +138,14 @@ def shop_byt_keyboard(*, jailed: bool = False) -> Keyboard:
         color=KeyboardButtonColor.POSITIVE,
     )
     kb.row()
+    kb.add(Text("📦 Привоз", {"cmd": "supply"}), color=KeyboardButtonColor.POSITIVE)
     if not jailed:
         kb.add(
             Text("🔓 Выкуп", {"cmd": "shop_buy", "item": "bail"}),
             color=KeyboardButtonColor.SECONDARY,
         )
-    kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("« Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 
@@ -416,10 +418,87 @@ def jobs_keyboard(level: int = 1) -> Keyboard:
             color=KeyboardButtonColor.SECONDARY,
         )
     kb.row()
+    kb.add(Text("📦 Привоз", {"cmd": "supply"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("📋 Заказы", {"cmd": "work_orders"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("🗺 Путь", {"cmd": "work_path"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🌟 Смена дня", {"cmd": "deep_work"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text("⭐ Уровни", {"cmd": "levels"}), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text("🏪 Лавка", {"cmd": "shop"}), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def supply_keyboard(stock: list) -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    n = 0
+    for s in stock or []:
+        if int(s.get("qty") or 0) < 1:
+            continue
+        from content import items_catalog as cat
+
+        it = cat.get_item(s["item_id"])
+        label = (it["name"] if it else s["item_id"])[:18]
+        kb.add(
+            Text(f"{label} {s['price']}🪙", {"cmd": "supply_buy", "item": s["item_id"]}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+        n += 1
+        if n % 2 == 0:
+            kb.row()
+    if n % 2:
+        kb.row()
+    kb.add(Text("🔄 Обновить", {"cmd": "supply"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("« Работы", {"cmd": "jobs"}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("📋 Меню", {"cmd": "menu"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def work_path_keyboard() -> Keyboard:
+    kb = Keyboard(one_time=False, inline=False)
+    kb.add(Text("🎣 Сети", {"cmd": "set_path", "path": "fish:net"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("🔱 Гарпун", {"cmd": "set_path", "path": "fish:spear"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text("⚔ Оружие", {"cmd": "set_path", "path": "forge:arms"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text("🐴 Подковы", {"cmd": "set_path", "path": "forge:shoes"}), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    kb.add(Text("« Работы", {"cmd": "jobs"}), color=KeyboardButtonColor.SECONDARY)
+    return kb
+
+
+def deep_job_keyboard(level: int = 1) -> Keyboard:
+    """Выбор работы для смены дня."""
+    kb = Keyboard(one_time=False, inline=False)
+    level = max(1, int(level or 1))
+    jobs = [
+        ("⛏", "mine"),
+        ("🛒", "market"),
+        ("🎣", "fish"),
+        ("🌾", "farm"),
+        ("🔥", "forge"),
+        ("🍺", "tavern"),
+        ("🐴", "stable"),
+        ("🛡", "guard"),
+    ]
+    n = 0
+    for mark, job in jobs:
+        req = config.JOB_LEVEL_REQ.get(job, 1)
+        if level < req:
+            continue
+        title = config.JOBS[job]["title"]
+        kb.add(
+            Text(title, {"cmd": "deep_job", "job": job}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+        n += 1
+        if n % 2 == 0:
+            kb.row()
+    if n % 2:
+        kb.row()
+    kb.add(Text("« Работы", {"cmd": "jobs"}), color=KeyboardButtonColor.SECONDARY)
     return kb
 
 

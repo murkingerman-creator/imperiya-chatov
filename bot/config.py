@@ -132,6 +132,45 @@ CARAVAN_NEED = 5
 CARAVAN_WINDOW_MIN = 60
 CARAVAN_TREASURY = 100
 
+# Работы 2.0 — привоз наборов
+SUPPLY_RESTOCK_HOURS = 2
+SUPPLY_PER_PLAYER = 2
+SUPPLY_SLOT_COUNT = (5, 8)
+SUPPLY_QTY_RANGE = (2, 6)
+SUPPLY_KIT_IDS = (
+    "kit_pick",
+    "kit_scales",
+    "kit_hammer",
+    "kit_whistle",
+    "kit_rod",
+    "kit_hoe",
+    "kit_mug",
+    "kit_brush",
+    "kit_cloak",
+)
+SUPPLY_PRICES = {
+    "kit_pick": 55,
+    "kit_scales": 50,
+    "kit_hammer": 60,
+    "kit_whistle": 55,
+    "kit_rod": 40,
+    "kit_hoe": 40,
+    "kit_mug": 35,
+    "kit_brush": 50,
+    "kit_cloak": 90,
+}
+WORK_HEAVY_JOBS = ("mine", "market", "forge", "guard", "stable", "smuggle")
+WORK_LIGHT_JOBS = ("tavern", "fish", "farm")
+WORK_BAREHAND_MULT = 0.6
+WORK_ORDER_REWARD = 80
+WORK_ORDER_XP = 25
+WORK_RUMOR_CHANCE = 0.15
+WORK_DEEP_REWARD_MULT = 2.0
+WORK_PATH_BONUS = 0.06
+BRIGADE_NEED = 3
+BRIGADE_WINDOW_MIN = 30
+BRIGADE_TREASURY = 120
+
 # Nation
 NATION_SWITCH_COOLDOWN_HOURS = 24
 CUSTOMIZE_COOLDOWN_HOURS = 6

@@ -1,7 +1,16 @@
+from datetime import timedelta, timezone
+
 from vkbottle.bot import Bot, Message
 
 from bot import config
-from bot.keyboards import jobs_keyboard, main_keyboard, minigame_keyboard, onboarding_keyboard
+from bot.keyboards import (
+    deep_job_keyboard,
+    jobs_keyboard,
+    main_keyboard,
+    minigame_keyboard,
+    onboarding_keyboard,
+    work_path_keyboard,
+)
 from db.database import SessionLocal
 from handlers.common import reply, resolve_name
 from handlers.rules import match_cmd, payload_cmd
@@ -10,7 +19,19 @@ from services.economy import WorkError, finish_minigame, start_minigame
 from services.item_effects import get_loadout
 from services.levels import format_level_line, jobs_unlock_help, sync_level
 from services.onboarding import advance_onboarding, onboarding_prompt
-from services.player import get_or_create_player
+from services.player import ensure_aware, get_or_create_player, utcnow
+from services.work_kits import resolve_job_kit
+from services.work_orders import get_orders_view
+from services.work_paths import format_path, set_path
+
+MSK = timezone(timedelta(hours=3))
+
+
+def _deep_available(player) -> bool:
+    last = ensure_aware(getattr(player, "last_deep_work_at", None))
+    if not last:
+        return True
+    return last.astimezone(MSK).date() < utcnow().astimezone(MSK).date()
 
 
 def register(bot: Bot) -> None:
@@ -23,12 +44,13 @@ def register(bot: Bot) -> None:
             await session.commit()
             await reply(
                 message,
-                "💼 Работы — у каждой своя механика (не просто угадайка).\n"
+                "💼 Работы 2.0 — наборы, заказы, пути, смена дня.\n"
                 f"{format_level_line(player)}\n"
-                "🎣 Рыбалка — подсечка · 🔥 Кузня — ритм · 🐴 Конюшня — уход\n"
-                "🛒 Рынок — купи/продай · ⛏ Шахта — риск\n"
-                "Ранги профессий копятся → бонус к доходу.\n"
-                "В стране: 5 смен/час = 🐪 караван в казну.\n"
+                "Тяжёлые смены нужен набор из 📦 Привоза.\n"
+                "Лёгкие (таверна/рыбалка/поле) можно без набора (−40%, без лута).\n"
+                "В стране: караван + бригада (3 игрока на одной работе).\n"
+                f"Путь: {format_path(player)} · "
+                f"Смена дня: {'✅' if _deep_available(player) else '⏳ завтра'}\n"
                 f"⚡ до {config.MAX_ENERGY}. Лут → 🎒 Сумка.",
                 keyboard=jobs_keyboard(player.level or 1).get_json(),
             )
@@ -45,6 +67,119 @@ def register(bot: Bot) -> None:
                 f"{format_level_line(player)}\n\n{jobs_unlock_help(player)}\n\n"
                 "XP: работы, ежедневка, рейды, контрабанда, квесты, сага.",
                 keyboard=jobs_keyboard(player.level or 1).get_json(),
+            )
+
+    @bot.on.message(
+        func=match_cmd("work_orders", "заказы", "📋 заказы", "заказ дня")
+    )
+    async def work_orders_menu(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            text = await get_orders_view(session, player)
+            await reply(
+                message,
+                text,
+                keyboard=jobs_keyboard(player.level or 1).get_json(),
+            )
+
+    @bot.on.message(func=match_cmd("work_path", "путь", "🗺 путь", "ветка"))
+    async def work_path_menu(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            await reply(
+                message,
+                "🗺 Путь мастерства (с ранга «ученик» по работе):\n"
+                f"Сейчас: {format_path(player)}\n"
+                f"+{int(config.WORK_PATH_BONUS * 100)}% к доходу выбранной ветки.\n"
+                "Рыбалка: сети / гарпун · Кузня: оружие / подковы.",
+                keyboard=work_path_keyboard().get_json(),
+            )
+
+    @bot.on.message(func=payload_cmd("set_path"))
+    async def work_path_set(message: Message):
+        payload = message.get_payload_json() or {}
+        path = str(payload.get("path") or "")
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            try:
+                note = set_path(player, path)
+                await session.commit()
+            except WorkError as e:
+                await reply(
+                    message,
+                    e.message,
+                    keyboard=work_path_keyboard().get_json(),
+                )
+                return
+            await reply(
+                message,
+                note,
+                keyboard=jobs_keyboard(player.level or 1).get_json(),
+            )
+
+    @bot.on.message(func=match_cmd("deep_work", "смена дня", "🌟 смена дня", "большая смена"))
+    async def deep_work_menu(message: Message):
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            if not _deep_available(player):
+                await reply(
+                    message,
+                    "🌟 Смена дня уже была сегодня (МСК). Завтра снова.",
+                    keyboard=jobs_keyboard(player.level or 1).get_json(),
+                )
+                return
+            await reply(
+                message,
+                "🌟 Смена дня (1 раз в сутки МСК):\n"
+                "Цепочка из 3 шагов · ×2 награда · выше шанс лута.\n"
+                "Выбери работу:",
+                keyboard=deep_job_keyboard(player.level or 1).get_json(),
+            )
+
+    @bot.on.message(func=payload_cmd("deep_job"))
+    async def deep_job_start(message: Message):
+        payload = message.get_payload_json() or {}
+        job = str(payload.get("job") or "")
+        name = await resolve_name(message)
+        async with SessionLocal() as session:
+            player = await get_or_create_player(session, message.from_id, name)
+            if not _deep_available(player):
+                await reply(
+                    message,
+                    "🌟 Смена дня уже была сегодня.",
+                    keyboard=jobs_keyboard(player.level or 1).get_json(),
+                )
+                return
+            try:
+                kit = await resolve_job_kit(session, player, job)
+                flags = {
+                    "deep": True,
+                    "barehanded": kit["barehanded"],
+                    "kit_item_id": kit["kit_item_id"],
+                }
+                game = start_minigame(player, job, charge_flags=flags)
+                player.last_deep_work_at = utcnow()
+                await session.commit()
+            except WorkError as e:
+                await reply(
+                    message,
+                    e.message,
+                    keyboard=jobs_keyboard(player.level or 1).get_json(),
+                )
+                return
+            extra = ""
+            if kit.get("kit_name"):
+                extra = f"\n🔧 Набор: {kit['kit_name']}"
+            elif kit.get("barehanded"):
+                extra = "\n✋ Без набора (−40%, без лута)"
+            await reply(
+                message,
+                game["prompt"] + extra,
+                keyboard=minigame_keyboard(game["token"], game["buttons"]).get_json(),
             )
 
     @bot.on.message(func=payload_cmd("job_locked"))
@@ -81,6 +216,9 @@ def register(bot: Bot) -> None:
                 skip_cd = True
                 flags["free_mine"] = True
             try:
+                kit = await resolve_job_kit(session, player, job)
+                flags["barehanded"] = kit["barehanded"]
+                flags["kit_item_id"] = kit["kit_item_id"]
                 game = start_minigame(
                     player, job, skip_cd=skip_cd, charge_flags=flags
                 )
@@ -95,6 +233,10 @@ def register(bot: Bot) -> None:
             prompt = game["prompt"]
             if flags.get("free_mine"):
                 prompt += "\n⚡ Заряд: шахта без КД ×2"
+            if kit.get("kit_name"):
+                prompt += f"\n🔧 {kit['kit_name']}"
+            elif kit.get("barehanded"):
+                prompt += "\n✋ Без набора: −40% и без лута"
             await reply(
                 message,
                 prompt,
@@ -112,7 +254,9 @@ def register(bot: Bot) -> None:
             try:
                 result = await finish_minigame(session, player, token, answer)
             except WorkError as e:
-                await reply(message, e.message, keyboard=jobs_keyboard(player.level or 1).get_json())
+                await reply(
+                    message, e.message, keyboard=jobs_keyboard(player.level or 1).get_json()
+                )
                 return
 
             if result.get("continue"):
@@ -164,6 +308,12 @@ def register(bot: Bot) -> None:
                     player.nation,
                     f"🐪 Караван {player.nation.flag_emoji if player.nation else ''} "
                     f"собран трудами граждан!",
+                )
+            if any("Бригада собрана" in n for n in notes):
+                await announce_nation(
+                    message.ctx_api,
+                    player.nation,
+                    f"👷 Бригада закрыла смену — в казну бонус!",
                 )
 
             step = player.onboarding_step or 0

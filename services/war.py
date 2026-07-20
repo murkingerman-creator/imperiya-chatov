@@ -266,6 +266,9 @@ async def raid(
         charge_notes.append(
             f"🏛 Военный сбор: +{int(config.TREASURY_WAR_LEVY_BONUS * 100)}% шанс"
         )
+    if await consume_buff_stack(session, leader.vk_id, "rumor_raid"):
+        chance = min(config.RAID_WIN_CHANCE_MAX, chance + 0.08)
+        charge_notes.append("🗣 Слух с работ: +8% шанс рейда")
     shield_until = ensure_aware(defender.shield_until)
     if shield_until and shield_until > now:
         chance = max(

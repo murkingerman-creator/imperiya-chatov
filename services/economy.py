@@ -84,14 +84,27 @@ def _build_minigame(job: str) -> tuple[str, str, list[tuple[str, str]], dict]:
     now = utcnow().timestamp()
 
     if job == "mine":
-        # риск: осторожно = стабильно; глубже = джекпот или обвал
+        steps = random.sample(["left", "right", "brace"], 2)
+        labels = {
+            "left": "⬅ Жила слева",
+            "right": "➡ Жила справа",
+            "brace": "🪵 Подпорка",
+        }
+        preview = " → ".join(labels[s] for s in steps)
         return (
-            "⛏ Шахта: жила манит вглубь.\n"
-            "Осторожно — меньше, но верно.\n"
-            "Глубже — ×2 или обвал.",
-            "choice",
-            [("🛡 Осторожно", "careful"), ("💥 Глубже!", "deep")],
-            {"mode": "risk"},
+            f"⛏ Шахта: крепь и удар.\n{preview}\nШаг 1/2:",
+            steps[0],
+            [(labels[k], k) for k in ("left", "right", "brace")],
+            {
+                "mode": "chain",
+                "steps": steps,
+                "idx": 0,
+                "labels": labels,
+                "keys": ["left", "right", "brace"],
+                "prefix": "⛏",
+                "fail_note": "Обвал — едва выбрался.",
+                "ok_note": "Жила взята. Крепь держит.",
+            },
         )
 
     if job == "market":
@@ -155,7 +168,16 @@ def _build_minigame(job: str) -> tuple[str, str, list[tuple[str, str]], dict]:
             f"Шаг 1/{len(steps)} — первый удар:",
             steps[0],
             [(labels[k], k) for k in ("soft", "hard", "quench")],
-            {"mode": "chain", "steps": steps, "idx": 0, "labels": labels},
+            {
+                "mode": "chain",
+                "steps": steps,
+                "idx": 0,
+                "labels": labels,
+                "keys": ["soft", "hard", "quench"],
+                "prefix": "🔥",
+                "fail_note": "Ритм сбит — металл остыл.",
+                "ok_note": "Клинок закалён. Ритм идеален.",
+            },
         )
 
     if job == "tavern":
@@ -169,26 +191,72 @@ def _build_minigame(job: str) -> tuple[str, str, list[tuple[str, str]], dict]:
         )
 
     if job == "stable":
+        # цепочка: уход → закрепление
         hour_seed = int(utcnow().timestamp() // 3600)
         mood = ["restless", "hungry", "dirty"][hour_seed % 3]
+        first = {"restless": "walk", "hungry": "feed", "dirty": "groom"}[mood]
+        second = random.choice(["secure", "calm", "check"])
+        steps = [first, second]
         labels = {
-            "restless": "🐴 Конь беспокойный — нужен выгул",
-            "hungry": "🐴 Конь голоден — покорми",
-            "dirty": "🐴 Шерсть в грязи — вычисти",
+            "walk": "🚶 Выгул",
+            "feed": "🥕 Покормить",
+            "groom": "🧹 Вычистить",
+            "secure": "🪢 Завязать",
+            "calm": "🤚 Успокоить",
+            "check": "👀 Осмотреть",
         }
-        correct = {"restless": "walk", "hungry": "feed", "dirty": "groom"}[mood]
+        mood_txt = {
+            "restless": "беспокойный — сначала выгул",
+            "hungry": "голоден — сначала покорми",
+            "dirty": "грязный — сначала вычисти",
+        }[mood]
         return (
-            f"🐴 Имперская конюшня\n{labels[mood]}\nЧто сделать?",
-            correct,
-            [
-                ("🧹 Вычистить", "groom"),
-                ("🚶 Выгул", "walk"),
-                ("🥕 Покормить", "feed"),
-            ],
-            {"mode": "stable", "mood": mood},
+            f"🐴 Конюшня: конь {mood_txt}.\n"
+            f"Шаг 1/2 — начни уход:",
+            steps[0],
+            [(labels[k], k) for k in ("groom", "walk", "feed")],
+            {
+                "mode": "chain",
+                "steps": steps,
+                "idx": 0,
+                "labels": labels,
+                "keys": ["groom", "walk", "feed", "secure", "calm", "check"],
+                "prefix": "🐴",
+                "fail_note": "Конь вспылил — смена сорвалась.",
+                "ok_note": "Конь спокоен. Смена закрыта.",
+                "_step_keys": {
+                    0: ["groom", "walk", "feed"],
+                    1: ["secure", "calm", "check"],
+                },
+            },
         )
 
     raise WorkError("Неизвестная работа.")
+
+
+def _build_deep_chain(job: str) -> tuple[str, str, list[tuple[str, str]], dict]:
+    """Большая смена: цепочка из 3 шагов."""
+    keys = ["a", "b", "c"]
+    labels = {"a": "① Держи", "b": "② Жми", "c": "③ Закрепи"}
+    steps = random.sample(keys, 3)
+    title = config.JOBS.get(job, {}).get("title", job)
+    preview = " → ".join(labels[s] for s in steps)
+    return (
+        f"🌟 Смена дня · {title}\nПовтори порядок:\n{preview}\nШаг 1/3:",
+        steps[0],
+        [(labels[k], k) for k in keys],
+        {
+            "mode": "chain",
+            "steps": steps,
+            "idx": 0,
+            "labels": labels,
+            "keys": keys,
+            "prefix": "🌟",
+            "fail_note": "Смена дня сорвалась.",
+            "ok_note": "Большая смена закрыта на отлично!",
+            "deep": True,
+        },
+    )
 
 
 def start_minigame(
@@ -197,9 +265,13 @@ def start_minigame(
     check_can_start_job(player, job, skip_cd=skip_cd)
     token = secrets.token_hex(4)
     now_ts = utcnow().timestamp()
-    prompt, correct, buttons, meta = _build_minigame(job)
-    meta.update(charge_flags or {})
-    ttl = 90 if meta.get("mode") in ("chain", "market", "timing") else 60
+    flags = dict(charge_flags or {})
+    if flags.get("deep"):
+        prompt, correct, buttons, meta = _build_deep_chain(job)
+    else:
+        prompt, correct, buttons, meta = _build_minigame(job)
+    meta.update(flags)
+    ttl = 120 if meta.get("deep") else (90 if meta.get("mode") in ("chain", "market", "timing") else 60)
 
     for k, s in list(_sessions.items()):
         if s.vk_id == player.vk_id or s.expires_at < now_ts:
@@ -290,23 +362,25 @@ def _resolve_answer(game: MiniSession, answer: str) -> dict:
         steps = list(game.meta.get("steps") or [])
         idx = int(game.meta.get("idx") or 0)
         labels = game.meta.get("labels") or {}
+        keys = list(game.meta.get("keys") or labels.keys() or ("soft", "hard", "quench"))
+        prefix = str(game.meta.get("prefix") or "🔥")
+        fail_note = str(game.meta.get("fail_note") or "Ритм сбит.")
+        ok_note = str(game.meta.get("ok_note") or "Смена закрыта идеально.")
         if idx >= len(steps) or answer != steps[idx]:
-            return {"success": False, "note": "Ритм сбит — металл остыл."}
+            return {"success": False, "note": fail_note}
         idx += 1
         game.meta["idx"] = idx
         if idx < len(steps):
             game.correct = steps[idx]
             nxt = labels.get(steps[idx], steps[idx])
+            step_keys = (game.meta.get("_step_keys") or {}).get(idx)
+            use_keys = list(step_keys) if step_keys else keys
             return {
                 "continue": True,
-                "prompt": (
-                    f"🔥 Верно! Шаг {idx + 1}/{len(steps)} — {nxt}"
-                ),
-                "buttons": [
-                    (labels.get(k, k), k) for k in ("soft", "hard", "quench")
-                ],
+                "prompt": f"{prefix} Верно! Шаг {idx + 1}/{len(steps)} — {nxt}",
+                "buttons": [(labels.get(k, k), k) for k in use_keys],
             }
-        return {"success": True, "note": "Клинок закалён. Ритм идеален."}
+        return {"success": True, "note": ok_note}
 
     if mode == "market":
         step = int(game.meta.get("step") or 1)
@@ -448,6 +522,15 @@ async def finish_minigame(
     else:
         mult = spec["success_mult"] if success else spec["fail_mult"]
 
+    barehanded = bool(game.meta.get("barehanded"))
+    if barehanded:
+        mult *= float(config.WORK_BAREHAND_MULT)
+        charge_notes.append("✋ Без набора: −40% доход, без лута")
+
+    if game.meta.get("deep"):
+        mult *= float(config.WORK_DEEP_REWARD_MULT)
+        charge_notes.append("🌟 Смена дня: ×2 награда")
+
     ev = await get_active_event(session)
     flash = await get_flash_event(session)
     event_key = ev["key"] if ev else None
@@ -488,6 +571,17 @@ async def finish_minigame(
     if prof_b:
         gross = max(1, int(gross * (1.0 + prof_b)))
         charge_notes.append(f"🏅 Ранг профессии: +{int(prof_b * 100)}%")
+
+    from services.work_paths import path_bonus
+
+    path_b = path_bonus(player, game.job)
+    if path_b:
+        gross = max(1, int(gross * (1.0 + path_b)))
+        charge_notes.append(f"🗺 Путь мастерства: +{int(path_b * 100)}%")
+
+    if await consume_buff_stack(session, player.vk_id, "rumor_work"):
+        gross = max(1, int(gross * 1.15))
+        charge_notes.append("🗣 Слух на работе: +15%")
 
     if await consume_buff_stack(session, player.vk_id, "craft_boost"):
         craft_b = float(config.SHOP_CRAFT_LICENSE_BONUS)
@@ -580,6 +674,8 @@ async def finish_minigame(
     setattr(player, _job_last_attr(game.job), now)
     player.last_work_at = now
     player.energy_updated_at = now
+    if game.meta.get("deep"):
+        player.last_deep_work_at = now
 
     # full energy on successful guard
     if success and game.job == "guard" and "full_energy_guard" in loadout.charges_ready:
@@ -596,7 +692,7 @@ async def finish_minigame(
 
     if player.nation_id:
         from services.weeklies import add_progress
-        from services.caravan import on_nation_job
+        from services.caravan import on_brigade_job, on_nation_job
 
         await add_progress(session, player.nation_id, "jobs_total", 1)
         if tax:
@@ -604,6 +700,9 @@ async def finish_minigame(
         caravan_note = await on_nation_job(session, player)
         if caravan_note:
             charge_notes.append(caravan_note)
+        brigade_note = await on_brigade_job(session, player, game.job)
+        if brigade_note:
+            charge_notes.append(brigade_note)
 
     quest_extra = 0
     if "quest_x2" in loadout.charges_ready:
@@ -622,6 +721,35 @@ async def finish_minigame(
     if contract_note:
         charge_notes.append(contract_note)
 
+    from services.work_orders import on_job_for_orders
+
+    order_note = await on_job_for_orders(session, player, game.job)
+    if order_note:
+        charge_notes.append(order_note)
+
+    from services.work_kits import wear_kit
+
+    wear_note = await wear_kit(session, player, game.meta.get("kit_item_id"))
+    if wear_note:
+        charge_notes.append(wear_note)
+    await session.commit()
+
+    # слухи: 15% → бафф рейда или работ
+    if random.random() < float(config.WORK_RUMOR_CHANCE):
+        if random.random() < 0.5:
+            await set_buff(session, player.vk_id, "rumor_raid", 1)
+            charge_notes.append("🗣 Слух: +шанс следующего рейда")
+        else:
+            await set_buff(
+                session,
+                player.vk_id,
+                "rumor_work",
+                1,
+                expires_at=utcnow() + timedelta(hours=2),
+            )
+            charge_notes.append("🗣 Слух: бафф к следующей работе (2ч)")
+        await session.commit()
+
     from services.levels import add_xp
 
     xp_info = await add_xp(session, player, config.XP_JOB, reason="работа")
@@ -632,45 +760,49 @@ async def finish_minigame(
 
     charge_notes.append(f"📖 {pick_flavor(game.job)}")
 
-    drop_pool = spec.get("loot_pool") or game.job
-    if cata and cata.get("loot_pool"):
-        drop_pool = cata["loot_pool"]
-    loot_m = loot_multiplier(ev, flash) * cataclysm_loot_mult(cata)
-    luck = float(loadout.loot_luck or 0.0)
-    luck += temple_luck_bonus(player.nation if player.nation_id else None)
-    if empire:
-        luck += float(empire["loot_luck"])
-    drop = await grant_drop(
-        session,
-        player,
-        drop_pool,
-        success=success,
-        job=game.job,
-        event_key=event_key,
-        loot_luck=luck,
-        loot_mult=loot_m,
-    )
-    if game.job == "mine" and "double_loot_mine" in loadout.charges_ready:
-        name = await try_consume_charge(session, player, "double_loot_mine", loadout)
-        if name:
-            drop2 = await grant_drop(
-                session,
-                player,
-                "mine",
-                success=True,
-                job="mine",
-                event_key=event_key,
-                loot_luck=loadout.loot_luck + 0.05,
-                loot_mult=loot_m,
-            )
-            charge_notes.append(f"⚡ {name}: двойной дроп")
-            if drop2 and not drop:
-                drop = drop2
-            elif drop2:
-                drop = {
-                    **drop2,
-                    "text": f"{drop['text'] if drop else ''}\n{drop2['text']}".strip(),
-                }
+    drop = None
+    if not barehanded:
+        drop_pool = spec.get("loot_pool") or game.job
+        if cata and cata.get("loot_pool"):
+            drop_pool = cata["loot_pool"]
+        loot_m = loot_multiplier(ev, flash) * cataclysm_loot_mult(cata)
+        if game.meta.get("deep"):
+            loot_m *= 1.35
+        luck = float(loadout.loot_luck or 0.0)
+        luck += temple_luck_bonus(player.nation if player.nation_id else None)
+        if empire:
+            luck += float(empire["loot_luck"])
+        drop = await grant_drop(
+            session,
+            player,
+            drop_pool,
+            success=success,
+            job=game.job,
+            event_key=event_key,
+            loot_luck=luck,
+            loot_mult=loot_m,
+        )
+        if game.job == "mine" and "double_loot_mine" in loadout.charges_ready:
+            name = await try_consume_charge(session, player, "double_loot_mine", loadout)
+            if name:
+                drop2 = await grant_drop(
+                    session,
+                    player,
+                    "mine",
+                    success=True,
+                    job="mine",
+                    event_key=event_key,
+                    loot_luck=loadout.loot_luck + 0.05,
+                    loot_mult=loot_m,
+                )
+                charge_notes.append(f"⚡ {name}: двойной дроп")
+                if drop2 and not drop:
+                    drop = drop2
+                elif drop2:
+                    drop = {
+                        **drop2,
+                        "text": f"{drop['text'] if drop else ''}\n{drop2['text']}".strip(),
+                    }
 
     return {
         "success": success,

@@ -16,6 +16,7 @@ from handlers import (
     shop,
     start,
     suggestions,
+    supply,
     tops,
     war,
     work,
@@ -30,6 +31,7 @@ def register_all(bot) -> None:
     profile.register(bot)
     daily.register(bot)
     work.register(bot)
+    supply.register(bot)
     tops.register(bot)
     war.register(bot)
     invite.register(bot)

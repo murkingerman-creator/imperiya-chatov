@@ -53,6 +53,17 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
     if player.energy < 1:
         raise SmuggleError("Недостаточно энергии.")
 
+    from services.work_kits import resolve_job_kit, wear_kit
+
+    try:
+        kit = await resolve_job_kit(session, player, "smuggle")
+    except Exception as e:
+        from services.economy import WorkError
+
+        if isinstance(e, WorkError):
+            raise SmuggleError(e.message) from e
+        raise
+
     loadout = await get_loadout(session, player)
     ev = await get_active_event(session)
     flash = await get_flash_event(session)
@@ -72,6 +83,10 @@ async def do_smuggle(session: AsyncSession, player: Player) -> dict:
     charge_notes: list[str] = []
     if flash:
         charge_notes.append(f"⚡ {flash['title']}")
+
+    wear_note = await wear_kit(session, player, kit.get("kit_item_id"))
+    if wear_note:
+        charge_notes.append(wear_note)
 
     if success:
         base = random.randint(config.SMUGGLE_REWARD_MIN, config.SMUGGLE_REWARD_MAX)

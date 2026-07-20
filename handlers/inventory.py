@@ -369,7 +369,10 @@ async def _show_bag(message: Message, page: int) -> None:
             return
 
         for it, qty in chunk:
-            lines.append(f"• {cat.format_item(it)} ×{qty}")
+            dur = ""
+            if it.get("_durability") is not None:
+                dur = f" [{it['_durability']}/{it.get('_max_durability', '?')}]"
+            lines.append(f"• {cat.format_item(it)}{dur} ×{qty}")
         lines.append("\nНажми предмет ниже для действий.")
         await reply(message, 
             "\n".join(lines),

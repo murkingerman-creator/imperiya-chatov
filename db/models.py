@@ -122,6 +122,11 @@ class Player(Base):
     job_counts: Mapped[str] = mapped_column(String(512), default="")
     tax_paid_week: Mapped[int] = mapped_column(Integer, default=0)
     tax_week_key: Mapped[str] = mapped_column(String(16), default="")
+    work_path: Mapped[str] = mapped_column(String(32), default="")
+    last_deep_work_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    order_progress: Mapped[str] = mapped_column(String(256), default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -227,6 +232,7 @@ class InventoryItem(Base):
     qty: Mapped[int] = mapped_column(Integer, default=1)
     # трофеи колеса: продаются дешевле, нельзя выставить на рынок
     bound_qty: Mapped[int] = mapped_column(Integer, default=0)
+    durability: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class EquippedItem(Base):

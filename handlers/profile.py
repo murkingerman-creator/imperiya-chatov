@@ -13,6 +13,8 @@ from services.levels import format_level_line, sync_level
 from services.professions import format_professions_line
 from services.shop import jail_minutes_left, shop_root_text
 from services.tax_week import tax_paid_display
+from services.work_kits import find_kit_row, format_kit_status
+from services.work_paths import format_path
 from services.player import (
     energy_next_in_minutes,
     ensure_aware,
@@ -95,6 +97,18 @@ def register(bot: Bot) -> None:
             if int(player.saga_day or 0) > 0:
                 saga_line = f"\n📖 Сага: день {min(player.saga_day, 7)}/7"
 
+            # прочность экипированного/первого набора
+            kit_bits = []
+            for job in ("mine", "fish", "forge", "market", "guard", "stable", "smuggle"):
+                row = await find_kit_row(session, player, job)
+                if not row:
+                    continue
+                it = cat.get_item(row.item_id)
+                kit_bits.append(format_kit_status(row, it))
+                if len(kit_bits) >= 3:
+                    break
+            kits_line = ", ".join(kit_bits) if kit_bits else "нет наборов"
+
             text = (
                 f"👤 {player.name}\n"
                 f"{format_level_line(player)}\n"
@@ -104,6 +118,8 @@ def register(bot: Bot) -> None:
                 f"🔥 Стрик ежедневки: {player.daily_streak or 0}\n"
                 f"🏅 Титулы: {format_titles(player)}\n"
                 f"🛠 {format_professions_line(player)}\n"
+                f"🗺 Путь: {format_path(player)}\n"
+                f"🔧 Наборы: {kits_line}\n"
                 f"📈 Прогресс:\n{progress}\n"
                 f"🎒 Экип: {eq_line}\n"
                 f"📖 Кодекс: {codex_n}/{cat.catalog_size()}\n"

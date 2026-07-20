@@ -15,6 +15,7 @@ from services.continents import maybe_resolve_week
 from services.flash_events import format_flash_announce, maybe_roll_flash
 from services.notify import post_wall
 from services.season import maybe_rotate_season
+from services.supply import ensure_supply_wave
 from services.world_events import ensure_daily_event
 
 logging.basicConfig(
@@ -83,6 +84,7 @@ async def background_loop(bot: Bot) -> None:
                     await post_flash(bot.api, session, announce)
                     logger.info("Flash event: %s", flash.get("key"))
                 await settle_expired_auctions(session)
+                await ensure_supply_wave(session)
                 war_msgs = await finish_due_wars(session)
                 for msg in war_msgs:
                     await post_wall(bot.api, msg)

@@ -53,6 +53,8 @@ def _i(
     charge: dict | None = None,
     aura: dict | None = None,
     desc: str = "",
+    work_kit_for: str | None = None,
+    max_durability: int | None = None,
 ) -> dict:
     return {
         "id": id,
@@ -65,6 +67,8 @@ def _i(
         "charge": charge,
         "aura": aura,
         "desc": desc,
+        "work_kit_for": work_kit_for,
+        "max_durability": max_durability,
     }
 
 
@@ -305,6 +309,29 @@ _reg(
        passives={"raid_mult": 0.08},
        charge={"code": "war_score_bonus", "cooldown_hours": 12},
        desc="Заряд: +2 очка войны бесед с рейда"),
+)
+
+
+# --- Рабочие наборы (только привоз империи) ---
+_reg(
+    _i("kit_pick", "Набор рудокопа", "common", "tool", "work_kit", [],
+       work_kit_for="mine", max_durability=10, desc="Допуск на шахту. Износ 10 смен."),
+    _i("kit_scales", "Набор торговца", "common", "tool", "work_kit", [],
+       work_kit_for="market", max_durability=10, desc="Допуск на рынок. Износ 10 смен."),
+    _i("kit_hammer", "Набор кузнеца", "common", "tool", "work_kit", [],
+       work_kit_for="forge", max_durability=10, desc="Допуск на кузню. Износ 10 смен."),
+    _i("kit_whistle", "Набор стража", "common", "tool", "work_kit", [],
+       work_kit_for="guard", max_durability=10, desc="Допуск на охрану. Износ 10 смен."),
+    _i("kit_rod", "Набор рыбака", "common", "tool", "work_kit", [],
+       work_kit_for="fish", max_durability=12, desc="Улучшает рыбалку. Износ 12 смен."),
+    _i("kit_hoe", "Набор пахаря", "common", "tool", "work_kit", [],
+       work_kit_for="farm", max_durability=12, desc="Улучшает поле. Износ 12 смен."),
+    _i("kit_mug", "Набор трактирщика", "common", "tool", "work_kit", [],
+       work_kit_for="tavern", max_durability=12, desc="Улучшает таверну. Износ 12 смен."),
+    _i("kit_brush", "Набор конюха", "common", "tool", "work_kit", [],
+       work_kit_for="stable", max_durability=10, desc="Допуск на конюшню. Износ 10 смен."),
+    _i("kit_cloak", "Набор тени", "uncommon", "tool", "work_kit", [],
+       work_kit_for="smuggle", max_durability=8, desc="Допуск на контрабанду. Износ 8 смен."),
 )
 
 

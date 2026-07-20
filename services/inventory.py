@@ -25,6 +25,7 @@ async def add_item(
     qty: int = 1,
     *,
     bound: bool = False,
+    durability: int | None = None,
 ) -> dict:
     it = cat.get_item(item_id)
     if not it:
@@ -41,6 +42,8 @@ async def add_item(
         row.qty += qty
         if bound:
             row.bound_qty = min(row.qty, int(row.bound_qty or 0) + qty)
+        if durability is not None and row.durability is None:
+            row.durability = durability
     else:
         session.add(
             InventoryItem(
@@ -48,6 +51,7 @@ async def add_item(
                 item_id=item_id,
                 qty=qty,
                 bound_qty=qty if bound else 0,
+                durability=durability,
             )
         )
 
@@ -97,7 +101,12 @@ async def list_bag(session: AsyncSession, vk_id: int) -> list[tuple[dict, int]]:
     for row in result.scalars().all():
         it = cat.get_item(row.item_id)
         if it:
-            out.append((it, row.qty))
+            item = dict(it)
+            if row.durability is not None or it.get("max_durability"):
+                max_d = int(it.get("max_durability") or 10)
+                dur = row.durability if row.durability is not None else max_d
+                item = {**item, "_durability": dur, "_max_durability": max_d}
+            out.append((item, row.qty))
     return out
 
 
